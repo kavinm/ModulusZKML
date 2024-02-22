@@ -424,7 +424,7 @@ impl<F: FieldExt> DenseMle<F, Tuple2<F>> {
 
 #[derive(Debug, Clone)]
 ///Newtype around a tuple of field elements
-pub struct TupleTree<F: FieldExt>(pub ((F, F)));
+pub struct TupleTree<F: FieldExt>(pub (F, F));
 
 impl<F: FieldExt> MleAble<F> for TupleTree<F> {
     type Repr = [Vec<F>; 2];
