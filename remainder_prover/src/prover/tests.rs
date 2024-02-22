@@ -3,7 +3,7 @@ use itertools::{repeat_n, Itertools};
 use rand::Rng;
 use remainder_ligero::ligero_commit::remainder_ligero_commit_prove;
 use serde_json::{from_reader, to_writer};
-use crate::{prover::helpers::test_circuit, gate::gate::BinaryOperation};
+use crate::{gate::gate::BinaryOperation, layer::simple_builders::{EqualityCheck, ZeroBuilder}, prover::helpers::test_circuit};
 
 use std::{cmp::max, fs, iter::repeat_with, path::Path, time::Instant};
 
@@ -23,7 +23,6 @@ use crate::{
     },
     prover::input_layer::enum_input_layer::CommitmentEnum,
     utils::get_random_mle,
-    zkdt::builders::{EqualityCheck, ZeroBuilder},
 };
 use remainder_shared_types::{
     transcript::{poseidon_transcript::PoseidonTranscript, Transcript},
