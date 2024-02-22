@@ -637,7 +637,7 @@ mod test {
     /// super basic symmetric test
     fn test_sumcheck_1() {
         let mut rng = test_rng();
-        let claim = Claim::new_raw(vec![Fr::from(1), Fr::from(0)], Fr::from(4));
+        let claim = Claim::new_raw(vec![Fr::from(1), Fr::from(0)], Fr::from(3));
 
         let matrix_a_vec = vec![Fr::from(1), Fr::from(2), Fr::from(3), Fr::from(1)];
         let matrix_b_vec = vec![Fr::from(1), Fr::from(1), Fr::from(1), Fr::from(1)];
