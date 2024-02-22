@@ -6,6 +6,7 @@ use tracing::instrument;
 use crate::gate::gate::Gate;
 use crate::mle::mle_enum::MleEnum;
 
+use super::matmult::MatMult;
 use super::{empty_layer::EmptyLayer, GKRLayer, Layer};
 
 use super::claims::Claim;
@@ -22,6 +23,8 @@ pub enum LayerEnum<F: FieldExt, Tr: Transcript<F>> {
     Gate(Gate<F, Tr>),
     /// Layer with zero variables within it
     EmptyLayer(EmptyLayer<F, Tr>),
+    /// MatMult Layer
+    MatMult(MatMult<F, Tr>),
 }
 
 impl<F: FieldExt, Tr: Transcript<F>> fmt::Debug for LayerEnum<F, Tr> {
@@ -30,6 +33,7 @@ impl<F: FieldExt, Tr: Transcript<F>> fmt::Debug for LayerEnum<F, Tr> {
             LayerEnum::Gkr(_) => write!(f, "GKR Layer"),
             LayerEnum::Gate(_) => write!(f, "Gate"),
             LayerEnum::EmptyLayer(_) => write!(f, "EmptyLayer"),
+            LayerEnum::MatMult(_) => write!(f, "MatMult"),
         }
     }
 }
@@ -47,6 +51,7 @@ impl<F: FieldExt, Tr: Transcript<F>> Layer<F> for LayerEnum<F, Tr> {
             LayerEnum::Gkr(layer) => layer.prove_rounds(claim, transcript),
             LayerEnum::Gate(layer) => layer.prove_rounds(claim, transcript),
             LayerEnum::EmptyLayer(layer) => layer.prove_rounds(claim, transcript),
+            LayerEnum::MatMult(layer) => layer.prove_rounds(claim, transcript),
         }
     }
 
@@ -61,6 +66,7 @@ impl<F: FieldExt, Tr: Transcript<F>> Layer<F> for LayerEnum<F, Tr> {
             LayerEnum::Gkr(layer) => layer.verify_rounds(claim, sumcheck_rounds, transcript),
             LayerEnum::Gate(layer) => layer.verify_rounds(claim, sumcheck_rounds, transcript),
             LayerEnum::EmptyLayer(layer) => layer.verify_rounds(claim, sumcheck_rounds, transcript),
+            LayerEnum::MatMult(layer) => layer.verify_rounds(claim, sumcheck_rounds, transcript),
         }
     }
 
@@ -70,6 +76,7 @@ impl<F: FieldExt, Tr: Transcript<F>> Layer<F> for LayerEnum<F, Tr> {
             LayerEnum::Gkr(layer) => layer.get_claims(),
             LayerEnum::Gate(layer) => layer.get_claims(),
             LayerEnum::EmptyLayer(layer) => layer.get_claims(),
+            LayerEnum::MatMult(layer) => layer.get_claims(),
         }
     }
 
@@ -78,6 +85,7 @@ impl<F: FieldExt, Tr: Transcript<F>> Layer<F> for LayerEnum<F, Tr> {
             LayerEnum::Gkr(layer) => layer.id(),
             LayerEnum::Gate(layer) => layer.id(),
             LayerEnum::EmptyLayer(layer) => layer.id(),
+            LayerEnum::MatMult(layer) => layer.id(),
         }
     }
 
@@ -125,6 +133,13 @@ impl<F: FieldExt, Tr: Transcript<F>> Layer<F> for LayerEnum<F, Tr> {
                 num_claims,
                 num_idx,
             ),
+            LayerEnum::MatMult(layer) => layer.get_wlx_evaluations(
+                claim_vecs,
+                claimed_vals,
+                claimed_mles,
+                num_claims,
+                num_idx,
+            ),
         }
     }
 }
@@ -135,7 +150,8 @@ impl<F: FieldExt, Tr: Transcript<F>> LayerEnum<F, Tr> {
         let expression = match self {
             LayerEnum::Gkr(layer) => &layer.expression,
             LayerEnum::EmptyLayer(layer) => &layer.expr,
-            LayerEnum::Gate(_) => unimplemented!(),
+            LayerEnum::Gate(_) 
+            | LayerEnum::MatMult(_) => unimplemented!(),
         };
 
         expression.get_expression_size(0)
@@ -147,6 +163,9 @@ impl<F: FieldExt, Tr: Transcript<F>> LayerEnum<F, Tr> {
             LayerEnum::Gate(gate_layer) => Box::new(gate_layer.circuit_description_fmt()),
             LayerEnum::EmptyLayer(empty_layer) => {
                 Box::new(empty_layer.expression().circuit_description_fmt())
+            },
+            LayerEnum::MatMult(matmult_layer) => {
+                Box::new(matmult_layer.circuit_description_fmt())
             }
         }
     }
