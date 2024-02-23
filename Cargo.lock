@@ -1683,6 +1683,46 @@ dependencies = [
 ]
 
 [[package]]
+name = "remainder-mnist"
+version = "0.1.0"
+dependencies = [
+ "approx",
+ "ark-bn254",
+ "ark-crypto-primitives",
+ "ark-ff",
+ "ark-poly",
+ "ark-serialize",
+ "ark-std",
+ "ark-test-curves",
+ "chrono",
+ "clap",
+ "criterion",
+ "dyn-clonable",
+ "dyn-clone",
+ "env_logger",
+ "hex",
+ "itertools 0.11.0",
+ "log",
+ "ndarray",
+ "ndarray-npy",
+ "num",
+ "num-bigint",
+ "num-traits",
+ "once_cell",
+ "pretty_env_logger",
+ "rand",
+ "rayon",
+ "remainder",
+ "remainder-ligero",
+ "remainder-shared-types",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tracing",
+ "tracing-subscriber 0.3.17",
+]
+
+[[package]]
 name = "remainder-shared-types"
 version = "0.1.0"
 dependencies = [
