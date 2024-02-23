@@ -158,7 +158,7 @@ impl<F: FieldExt, Tr: Transcript<F>> MatMult<F, Tr> {
         let mut challenges: Vec<F> = vec![];
         let mut challenge: Option<F> = None;
 
-        let first_message = compute_sumcheck_message_no_beta_table(&[self.matrix_a.mle_ref.clone(), self.matrix_b.mle_ref.clone()], 2, 0).unwrap();
+        let first_message = compute_sumcheck_message_no_beta_table(&[self.matrix_a.mle_ref.clone(), self.matrix_b.mle_ref.clone()], 0, 2).unwrap();
         messages.push((first_message, challenge));
 
         let num_vars_middle = self.num_vars_middle_ab.unwrap(); // TODO: raise error if not
@@ -169,7 +169,7 @@ impl<F: FieldExt, Tr: Transcript<F>> MatMult<F, Tr> {
             challenges.push(chal);
             self.matrix_a.mle_ref.fix_variable(round - 1, challenge.clone().unwrap());
             self.matrix_b.mle_ref.fix_variable(round - 1, challenge.clone().unwrap());
-            let next_message = compute_sumcheck_message_no_beta_table(&[self.matrix_a.mle_ref.clone(), self.matrix_b.mle_ref.clone()], 2, round).unwrap();
+            let next_message = compute_sumcheck_message_no_beta_table(&[self.matrix_a.mle_ref.clone(), self.matrix_b.mle_ref.clone()], round, 2).unwrap();
             messages.push((next_message, challenge));
         }
 
