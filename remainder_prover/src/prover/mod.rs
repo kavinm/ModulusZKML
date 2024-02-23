@@ -315,9 +315,19 @@ pub trait GKRCircuit<F: FieldExt> {
 
         // --- Go through circuit output layers and grab claims on each ---
         for output in output_layers.iter_mut() {
+            // --- If the output_layer contains values sent to the verifier, add them to the transcript ---
+            match output {
+                MleEnum::Dense(mle) => {
+                    let elements = mle.bookkeeping_table();
+                    transcript.append_field_elements("Output MLE contents", elements).unwrap();
+                }
+                _ => {}
+            }
             info!("New Output Layer: {:?}", output.get_layer_id());
             let mut claim = None;
             let bits = output.index_mle_indices(0);
+
+            let mut output_mut = output.clone();
 
             let claim = if bits != 0 {
                 debug!("Bookkeeping table: {:?}", output.bookkeeping_table());
@@ -326,20 +336,20 @@ pub trait GKRCircuit<F: FieldExt> {
                     let challenge = transcript
                         .get_challenge("Setting Output Layer Claim")
                         .unwrap();
-                    claim = output.fix_variable(bit, challenge);
+                    claim = output_mut.fix_variable(bit, challenge);
                 }
 
                 // --- Gather the claim and layer ID ---
                 claim.unwrap()
             } else {
-                Claim::new_raw(vec![], output.bookkeeping_table()[0])
+                Claim::new_raw(vec![], output_mut.bookkeeping_table()[0])
             };
 
             // --- Gather the claim and layer ID ---
             let mut claim = claim;
             let layer_id = output.get_layer_id();
             claim.to_layer_id = Some(layer_id);
-            claim.mle_ref = Some(output.clone());
+            claim.mle_ref = Some(output_mut.clone());
             debug!("Creating a claim: {:#?}", claim);
             
 
@@ -649,13 +659,21 @@ pub trait GKRCircuit<F: FieldExt> {
             span!(Level::DEBUG, "verifier_output_claims_span").entered();
 
         // --- NOTE that all the `Expression`s and MLEs contained within `gkr_proof` are already bound! ---
-        for output in output_layers.iter() {
-            let mle_indices = output.mle_indices();
+        for mut output in output_layers.into_iter() {
+            // --- If the output_layer contains values sent to the verifier, add them to the transcript ---
+            match &output {
+                MleEnum::Dense(mle) => {
+                    let elements = mle.bookkeeping_table();
+                    transcript.append_field_elements("Output MLE contents", elements).unwrap();
+                }
+                MleEnum::Zero(_) => {}
+            }
+            let mle_indices = output.mle_indices().to_vec();
             let mut claim_chal: Vec<F> = vec![];
             debug!("Bookkeeping table: {:#?}", output.bookkeeping_table());
             for (bit, index) in mle_indices
-                .iter()
-                .filter(|index| !matches!(index, &&MleIndex::Fixed(_)))
+                .into_iter()
+                .filter(|index| !matches!(index, &MleIndex::Fixed(_)))
                 .enumerate()
             {
                 let challenge = transcript
@@ -665,22 +683,25 @@ pub trait GKRCircuit<F: FieldExt> {
                 // We assume that all the outputs are zero-valued for now. We should be
                 // doing the initial step of evaluating V_1'(z) as specified in Thaler 13 page 14,
                 // but given the assumption we have that V_1'(z) = 0 for all z if the prover is honest.
-                if MleIndex::Bound(challenge, bit) != *index {
-                    dbg!(&(challenge, bit));
-                    dbg!(&index);
-                    return Err(GKRError::ErrorWhenVerifyingOutputLayer);
-                }
+                // if MleIndex::Bound(challenge, bit) != *index {
+                //     dbg!(&(challenge, bit));
+                //     dbg!(&index);
+                //     return Err(GKRError::ErrorWhenVerifyingOutputLayer);
+                // }
+                output.fix_variable(bit, challenge);
                 claim_chal.push(challenge);
             }
             let layer_id = output.get_layer_id();
             info!("New Output Layer {:?}", layer_id);
 
+            let claim_eval = output.bookkeeping_table()[0];
+
             let claim = Claim::new(
-                mle_indices
+                output.mle_indices()
                     .iter()
                     .map(|index| index.val().unwrap())
                     .collect(),
-                F::zero(),
+                claim_eval,
                 None,
                 Some(layer_id),
                 Some(output.clone()),

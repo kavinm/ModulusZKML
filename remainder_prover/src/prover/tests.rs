@@ -3,7 +3,8 @@ use itertools::{repeat_n, Itertools};
 use rand::Rng;
 use remainder_ligero::ligero_commit::remainder_ligero_commit_prove;
 use serde_json::{from_reader, to_writer};
-use crate::{gate::gate::BinaryOperation, layer::simple_builders::{EqualityCheck, ZeroBuilder}, prover::helpers::test_circuit};
+use tracing::Level;
+use crate::{gate::gate::BinaryOperation, layer::simple_builders::{EqualityCheck, ZeroBuilder}, mle::mle_enum::MleEnum, prover::helpers::test_circuit};
 
 use std::{cmp::max, fs, iter::repeat_with, path::Path, time::Instant};
 
@@ -1879,4 +1880,75 @@ fn test_combine_3_circuit() {
     };
 
     test_circuit(circuit, None);
+}
+
+/// This Circuit is identical to the `SimpleCircuit` except that it
+/// does not zero out it's output with a hint, instead allowing the output layer
+/// to be non-zero
+struct SimpleNonZeroOutputCircuit<F: FieldExt> {
+    mle: DenseMle<F, Tuple2<F>>,
+    size: usize,
+}
+impl<F: FieldExt> GKRCircuit<F> for SimpleNonZeroOutputCircuit<F> {
+    type Transcript = PoseidonTranscript<F>;
+
+    fn synthesize(&mut self) -> Witness<F, Self::Transcript> {
+        // --- The input layer should just be the concatenation of `mle` and `output_input` ---
+        let input_mles: Vec<Box<&mut dyn Mle<F>>> = vec![Box::new(&mut self.mle)];
+        let mut input_layer =
+            InputLayerBuilder::new(input_mles, None, LayerId::Input(0));
+        let mle_clone = &self.mle;
+
+        // --- Create Layers to be added to ---
+        let mut layers = Layers::new();
+
+        // --- Create a SimpleLayer from the first `mle` within the circuit ---
+        let mult_builder = from_mle(
+            mle_clone,
+            // --- The expression is a simple product between the first and second halves ---
+            |mle| ExpressionStandard::products(vec![mle.first(), mle.second()]),
+            // --- The witness generation simply zips the two halves and multiplies them ---
+            |mle, layer_id, prefix_bits| {
+                DenseMle::new_from_iter(
+                    mle.into_iter()
+                        .map(|Tuple2((first, second))| first * second),
+                    layer_id,
+                    prefix_bits,
+                )
+            },
+        );
+
+        // --- Stacks the two aforementioned layers together into a single layer ---
+        // --- Then adds them to the overall circuit ---
+        let first_layer_output = layers.add_gkr(mult_builder);
+
+        let input_layer: LigeroInputLayer<F, Self::Transcript> = input_layer.to_input_layer_with_rho_inv(4, 1.);
+        let input_layers = vec![input_layer.to_enum()];
+
+        Witness {
+            layers,
+            output_layers: vec![first_layer_output.mle_ref().get_enum()],
+            input_layers,
+        }
+    }
+}
+
+#[test]
+fn test_gkr_simple_non_zero_circuit() {
+    // let subscriber = tracing_subscriber::fmt().with_max_level(Level::TRACE).finish();
+    // tracing::subscriber::set_global_default(subscriber)
+    //     .map_err(|_err| eprintln!("Unable to set global default subscriber"));
+
+    let mut rng = test_rng();
+    let size = 5;
+
+    // --- This should be 2^2 ---
+    let mle: DenseMle<Fr, Tuple2<Fr>> = DenseMle::new_from_iter(
+        (0..1 << 5).map(|_| (Fr::from(rng.gen::<u64>()), Fr::from(rng.gen::<u64>())).into()),
+        LayerId::Input(0),
+        None,
+    );
+
+    let circuit: SimpleNonZeroOutputCircuit<Fr> = SimpleNonZeroOutputCircuit { mle, size };
+    test_circuit(circuit, Some(Path::new("simple_non_zero_circuit_optimized.json")));
 }
