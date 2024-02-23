@@ -335,8 +335,8 @@ pub fn compute_full_gate<F: FieldExt>(
 /// compute sumcheck message without a beta table!!!!!!!!!!!!!!
 pub fn compute_sumcheck_message_no_beta_table<F: FieldExt>(
     mles: &[impl MleRef<F = F>],
-    round_index: usize,
     degree: usize,
+    round_index: usize,
 ) -> Result<Vec<F>, GateError> {
 
     // --- Go through all of the MLEs being multiplied together on the LHS and see if any of them contain an IV ---
