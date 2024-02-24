@@ -94,6 +94,10 @@ impl<F: FieldExt> InputLayerBuilder<F> {
     /// the `layer_id` which is passed in here!
     pub fn new(mut input_mles: Vec<Box<&mut (dyn Mle<F> + 'static)>>, extra_mle_num_vars: Option<Vec<usize>>, layer_id: LayerId) -> Self {
         let extra_mle_indices = InputLayerBuilder::index_input_mles(&mut input_mles, extra_mle_num_vars);
+
+        for input_mle in &input_mles {
+            println!("input_mles prefix bits {:?}", input_mle.get_prefix_bits().unwrap());
+        }
         let input_mles = input_mles.into_iter().map(|mle| dyn_clone::clone_box(*mle)).collect_vec();
         Self {
             mles: input_mles,
