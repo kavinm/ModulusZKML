@@ -11,18 +11,13 @@ pub(crate) mod tests;
 use std::collections::HashMap;
 
 use crate::{
-    gate::gate::{Gate, BinaryOperation},
+    gate::gate::{BinaryOperation, Gate},
     layer::{
-        claims::{aggregate_claims, get_num_wlx_evaluations},
-        claims::{Claim, ClaimGroup},
-        layer_enum::LayerEnum,
-        GKRLayer, Layer, LayerBuilder, LayerError, LayerId,
+        claims::{aggregate_claims, get_num_wlx_evaluations, Claim, ClaimGroup}, layer_enum::LayerEnum, matmult::{product_two_matrices, MatMult, Matrix}, GKRLayer, Layer, LayerBuilder, LayerError, LayerId
     },
     mle::{
-        dense::{DenseMle, DenseMleRef},
-        MleRef,
+        dense::{DenseMle, DenseMleRef}, mle_enum::MleEnum, MleIndex, MleRef
     },
-    mle::{mle_enum::MleEnum, MleIndex},
     sumcheck::evaluate_at_a_point,
     utils::{hash_layers, pad_to_nearest_power_of_two},
 };
@@ -32,7 +27,7 @@ use tracing::{debug, info, trace};
 // use lcpc_2d::{FieldExt, ligero_commit::{remainder_ligero_commit_prove, remainder_ligero_eval_prove, remainder_ligero_verify}, adapter::convert_halo_to_lcpc, LcProofAuxiliaryInfo, poseidon_ligero::PoseidonSpongeHasher, ligero_structs::LigeroEncoding, ligero_ml_helper::naive_eval_mle_at_challenge_point};
 // use lcpc_2d::fs_transcript::halo2_remainder_transcript::Transcript;
 
-use ark_std::{end_timer, start_timer};
+use ark_std::{end_timer, log2, start_timer};
 use remainder_shared_types::transcript::Transcript;
 use remainder_shared_types::FieldExt;
 
@@ -140,6 +135,36 @@ impl<F: FieldExt, Tr: Transcript<F> + 'static> Layers<F, Tr> {
         let res_mle: DenseMle<F, F> = DenseMle::new_from_raw(res_table, id, None);
 
         res_mle
+    }
+
+    /// add a matmult layer to a list of layers. in general, we want to compute A*B where A and B are both matrices
+    /// 
+    /// # Arguments
+    /// * `matrix_a`: the mleref that represents the matrix A
+    /// * `matrix_b`: the mleref that represents the matrix B
+    /// * `num_vars_rows_a`: the number of variables needed to enumerate the rows of A
+    /// * `num_vars_middle_ab`: the number of variables needed to enumerate the columns of A or rows of B
+    ///                         because we are doing matrix multiplication, these need to be equal
+    /// * `num_vars_cols_b`: the number of variables needed to enumerate the columns of B
+    ///
+    /// # Returns
+    /// A flattened `DenseMle` that represents the evaluations the product of the two matrices across the boolean hypercube 
+    /// over (`num_vars_rows_a` + `num_vars_cols_b`) variables
+    pub fn add_matmult_layer(
+        &mut self,
+        matrix_a: Matrix<F>, 
+        matrix_b: Matrix<F>,
+    ) -> DenseMle<F, F> {
+        
+        let id = LayerId::Layer(self.0.len());
+        let matmult = MatMult::new(id, matrix_a.clone(), matrix_b.clone());
+        self.0.push(matmult.get_enum());
+
+        let product_matrix = product_two_matrices(matrix_a, matrix_b);
+
+        dbg!(log2(product_matrix.len()));
+
+        DenseMle::new_from_raw(product_matrix, id, None)
     }
 
     /// Creates a new Layers
@@ -521,6 +546,8 @@ pub trait GKRCircuit<F: FieldExt> {
                 let layer_claims_vec = claims
                     .get(&layer_id)
                     .ok_or_else(|| GKRError::NoClaimsForLayer(layer_id.clone()))?;
+
+                println!("layer_claims_vec {:?}", layer_claims_vec);
 
                 let layer_claim_group = ClaimGroup::new(layer_claims_vec.clone()).unwrap();
                 trace!(

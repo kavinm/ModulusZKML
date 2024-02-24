@@ -260,33 +260,39 @@ where
 /// * Take in as input the files which Ben's Rust code takes in
 /// * Output as files the actual proof which gets generated from that code
 fn main() -> Result<(), MatMulBinaryError> {
-    let args = Args::parse();
+    // let args = Args::parse();
 
-    // --- Tracing subscriber (i.e. outputs trace messages in stdout) if asked
-    // for ---
-    let formatter =
-    // Construct a custom formatter for `Debug` fields
-    format::debug_fn(|writer, field, value| write!(writer, "{}: {:#?}", field, value))
-        // Use the `tracing_subscriber::MakeFmtExt` trait to wrap the
-        // formatter so that a delimiter is added between fields.
-        .delimited("\n");
+    // // --- Tracing subscriber (i.e. outputs trace messages in stdout) if asked
+    // // for ---
+    // let formatter =
+    // // Construct a custom formatter for `Debug` fields
+    // format::debug_fn(|writer, field, value| write!(writer, "{}: {:#?}", field, value))
+    //     // Use the `tracing_subscriber::MakeFmtExt` trait to wrap the
+    //     // formatter so that a delimiter is added between fields.
+    //     .delimited("\n");
 
-    if args.debug_tracing_subscriber || args.info_tracing_subscriber {
-        let subscriber = FmtSubscriber::builder()
-            .with_line_number(true)
-            .with_max_level(if args.debug_tracing_subscriber {tracing::Level::DEBUG} else {tracing::Level::INFO})
-            .with_level(true)
-            .with_span_events(FmtSpan::ENTER | FmtSpan::CLOSE)
-            .with_ansi(false)
-            .fmt_fields(formatter)
-            // .pretty()
-            .finish();
-        let _default_guard = tracing::subscriber::set_global_default(subscriber);
-    }
+    // if args.debug_tracing_subscriber || args.info_tracing_subscriber {
+    //     let subscriber = FmtSubscriber::builder()
+    //         .with_line_number(true)
+    //         .with_max_level(if args.debug_tracing_subscriber {tracing::Level::DEBUG} else {tracing::Level::INFO})
+    //         .with_level(true)
+    //         .with_span_events(FmtSpan::ENTER | FmtSpan::CLOSE)
+    //         .with_ansi(false)
+    //         .fmt_fields(formatter)
+    //         // .pretty()
+    //         .finish();
+    //     let _default_guard = tracing::subscriber::set_global_default(subscriber);
+    // }
 
-    // --- Log the args ---
-    let args_as_string = format!("{:?}", args);
-    debug!(args_as_string);
+    // // --- Log the args ---
+    // let args_as_string = format!("{:?}", args);
+    // debug!(args_as_string);
+
+    // generate dummy values
+
+    // initialize the matmul circuit
+
+    // do proving / verifying / writing proof to file
 
     // --- Sanitycheck (need minibatch number if we have batch size) + grabbing minibatch data ---
 

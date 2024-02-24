@@ -263,7 +263,7 @@ impl<F: FieldExt, Tr: Transcript<F>> Layer<F> for MatMult<F, Tr> {
 
         let mut challenges: Vec<F> = vec![];
 
-        let first_message = compute_sumcheck_message_no_beta_table(&[self.matrix_a.mle_ref.clone(), self.matrix_b.mle_ref.clone()], 2, 0).unwrap();
+        let first_message = compute_sumcheck_message_no_beta_table(&[self.matrix_a.mle_ref.clone(), self.matrix_b.mle_ref.clone()], 0, 2).unwrap();
         transcript
             .append_field_elements("Initial Sumcheck evaluations", &first_message)
             .unwrap();
@@ -282,7 +282,7 @@ impl<F: FieldExt, Tr: Transcript<F>> Layer<F> for MatMult<F, Tr> {
                 challenges.push(challenge);
                 self.matrix_a.mle_ref.fix_variable(round - 1, challenge);
                 self.matrix_b.mle_ref.fix_variable(round - 1, challenge);
-                let next_message = compute_sumcheck_message_no_beta_table(&[self.matrix_a.mle_ref.clone(), self.matrix_b.mle_ref.clone()], 2, round).unwrap();
+                let next_message = compute_sumcheck_message_no_beta_table(&[self.matrix_a.mle_ref.clone(), self.matrix_b.mle_ref.clone()], round, 2).unwrap();
                 
                 transcript
                     .append_field_elements("Sumcheck evaluations", &next_message)
