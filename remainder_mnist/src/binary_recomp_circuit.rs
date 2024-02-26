@@ -10,6 +10,7 @@ pub struct BinaryRecompCircuit<F: FieldExt> {
     mles: Vec<DenseMle<F, F>>,
     signed_bin_decomp_mles: Vec<DenseMle<F, BinDecomp16Bit<F>>>,
 }
+
 impl<F: FieldExt> GKRCircuit<F> for BinaryRecompCircuit<F> {
     type Transcript = PoseidonTranscript<F>;
 
@@ -87,6 +88,19 @@ impl<F: FieldExt> GKRCircuit<F> for BinaryRecompCircuit<F> {
     }
 }
 
+impl<F: FieldExt> BinaryRecompCircuit<F> {
+    /// Creates a new instance of BinaryRecompCircuit
+    pub fn new(
+        mles: Vec<DenseMle<F, F>>,
+        signed_bin_decomp_mles: Vec<DenseMle<F, BinDecomp16Bit<F>>>,
+    ) -> Self {
+        Self {
+            mles,
+            signed_bin_decomp_mles,
+        }
+    }
+}
+
 #[test]
 fn test_bin_recomp_16_bits() {
 
@@ -116,20 +130,6 @@ fn test_bin_recomp_16_bits() {
         Err(err) => {
             println!("{}", err);
             panic!();
-        }
-    }
-}
-
-
-impl<F: FieldExt> BinaryRecompCircuit<F> {
-    /// Creates a new instance of BinaryRecompCircuit
-    pub fn new(
-        mles: Vec<DenseMle<F, F>>,
-        signed_bin_decomp_mles: Vec<DenseMle<F, BinDecomp16Bit<F>>>,
-    ) -> Self {
-        Self {
-            mles,
-            signed_bin_decomp_mles,
         }
     }
 }
