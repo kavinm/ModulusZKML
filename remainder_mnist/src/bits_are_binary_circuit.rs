@@ -162,7 +162,7 @@ pub fn generate_16_bit_decomp<F: FieldExt>(
 }
 
 #[test]
-fn test_bin_decomp_16_bit_bits_are_binary_batched() {
+fn test_bin_decomp_16_bit_bits_are_binary() {
 
     // generate a random 16 bits, compute the number from the decomposition
     let (
