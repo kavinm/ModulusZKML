@@ -547,8 +547,6 @@ pub trait GKRCircuit<F: FieldExt> {
                     .get(&layer_id)
                     .ok_or_else(|| GKRError::NoClaimsForLayer(layer_id.clone()))?;
 
-                println!("layer_claims_vec {:?}", layer_claims_vec);
-
                 let layer_claim_group = ClaimGroup::new(layer_claims_vec.clone()).unwrap();
                 trace!(
                     "Layer Claim Group for {:?}:\n{:#?}",
