@@ -70,7 +70,7 @@ impl<F: FieldExt> MleAble<F> for BinDecomp16Bit<F> {
 impl<F: FieldExt> DenseMle<F, BinDecomp16Bit<F>> {
     /// Returns a list of MLERefs, one for each bit
     /// TODO!(ryancao): Change this back to [DenseMleRef<F>; 16] and make it work!
-    pub(crate) fn mle_bit_refs(&'_ self) -> Vec<DenseMleRef<F>> {
+    pub fn mle_bit_refs(&'_ self) -> Vec<DenseMleRef<F>> {
         let num_vars = self.num_iterated_vars();
 
         // --- There are sixteen components to this MLE ---
