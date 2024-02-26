@@ -20,6 +20,7 @@ pub struct Matrix<F: FieldExt> {
     pub mle_ref: DenseMleRef<F>,
     pub num_rows_vars: usize,
     pub num_cols_vars: usize,
+    pub prefix_bits: Option<Vec<MleIndex<F>>>,
 }
 
 impl<F: FieldExt> Matrix<F> {
@@ -27,11 +28,13 @@ impl<F: FieldExt> Matrix<F> {
         mle_ref: DenseMleRef<F>, 
         num_rows_vars: usize,
         num_cols_vars: usize,
+        prefix_bits: Option<Vec<MleIndex<F>>>,
     ) -> Matrix<F> {
         Matrix {
             mle_ref,
             num_rows_vars,
-            num_cols_vars
+            num_cols_vars,
+            prefix_bits,
         }
     }
 }
@@ -93,7 +96,7 @@ impl<F: FieldExt, Tr: Transcript<F>> MatMult<F, Tr> {
         println!("matrix_a_mle_ref {:?}", matrix_a_mle_ref.mle_indices());
 
         let transpose_timer = start_timer!(|| "transpose matrix");
-        let mut matrix_a_transp = gen_transpose_matrix(&matrix_a_mle_ref, num_rows_a, num_cols_a);
+        let mut matrix_a_transp = gen_transpose_matrix(&matrix_a_mle_ref, num_rows_a, num_cols_a, self.matrix_a.prefix_bits.clone());
         end_timer!(transpose_timer);
 
         println!("matrix_a_transp {:?}", matrix_a_transp.mle_indices());
@@ -539,6 +542,7 @@ pub fn gen_transpose_matrix<F: FieldExt>(
     matrix: &DenseMleRef<F>,
     num_rows: usize,
     num_cols: usize,
+    prefix_bits: Option<Vec<MleIndex<F>>>,
 ) -> DenseMleRef<F> {
 
     let matrix_array_2 = Array2::from_shape_vec((num_rows, num_cols), matrix.bookkeeping_table.clone()).unwrap();
@@ -547,7 +551,7 @@ pub fn gen_transpose_matrix<F: FieldExt>(
         .map(|x| x.to_vec())
         .flat_map(|row| row)
         .collect_vec();
-    DenseMle::new_from_raw(matrix_transp_vec, matrix.layer_id, None).mle_ref()
+    DenseMle::new_from_raw(matrix_transp_vec, matrix.layer_id, prefix_bits).mle_ref()
 
 }
 
@@ -557,7 +561,7 @@ pub fn product_two_matrices<F: FieldExt>(
 ) -> Vec<F> {
     let num_middle_ab = 1 << matrix_a.num_cols_vars;
 
-        let matrix_b_transpose = gen_transpose_matrix(&matrix_b.mle_ref, 1 << matrix_b.num_rows_vars, 1 << matrix_b.num_cols_vars);
+        let matrix_b_transpose = gen_transpose_matrix(&matrix_b.mle_ref, 1 << matrix_b.num_rows_vars, 1 << matrix_b.num_cols_vars, matrix_a.prefix_bits);
         let product_matrix = matrix_a.mle_ref.bookkeeping_table.chunks(num_middle_ab as usize).flat_map(
             |chunk_a| {
                 matrix_b_transpose.bookkeeping_table.chunks(num_middle_ab).map(
@@ -588,8 +592,8 @@ mod test {
         let mle_a: DenseMle<Fr, Fr> = DenseMle::new_from_raw(mle_vec_a, LayerId::Input(0), None);
         let mle_b: DenseMle<Fr, Fr> = DenseMle::new_from_raw(mle_vec_b, LayerId::Input(0), None);
 
-        let matrix_a = Matrix::new(mle_a.mle_ref(), 2, 1);
-        let matrix_b = Matrix::new(mle_b.mle_ref(), 1, 1);
+        let matrix_a = Matrix::new(mle_a.mle_ref(), 2, 1, None);
+        let matrix_b = Matrix::new(mle_b.mle_ref(), 1, 1, None);
 
         let res_product = product_two_matrices(matrix_a, matrix_b);
 
@@ -620,8 +624,8 @@ mod test {
         let mle_a: DenseMle<Fr, Fr> = DenseMle::new_from_raw(mle_vec_a, LayerId::Input(0), None);
         let mle_b: DenseMle<Fr, Fr> = DenseMle::new_from_raw(mle_vec_b, LayerId::Input(0), None);
 
-        let matrix_a = Matrix::new(mle_a.mle_ref(), 3, 2);
-        let matrix_b = Matrix::new(mle_b.mle_ref(), 2, 1);
+        let matrix_a = Matrix::new(mle_a.mle_ref(), 3, 2, None);
+        let matrix_b = Matrix::new(mle_b.mle_ref(), 2, 1, None);
 
         let res_product = product_two_matrices(matrix_a, matrix_b);
 
@@ -648,7 +652,7 @@ mod test {
         let expected_vec = vec![Fr::from(1), Fr::from(9), Fr::from(13), Fr::from(3), Fr::from(2), Fr::from(10), Fr::from(1), Fr::from(10)];
         let expected_ref: DenseMleRef<Fr> = DenseMle::new_from_raw(expected_vec, LayerId::Input(0), None).mle_ref();
 
-        assert_eq!(gen_transpose_matrix(&mle_ref, 4, 2).bookkeeping_table, expected_ref.bookkeeping_table);
+        assert_eq!(gen_transpose_matrix(&mle_ref, 4, 2, None).bookkeeping_table, expected_ref.bookkeeping_table);
     }
 
     #[test]
@@ -662,8 +666,8 @@ mod test {
         let matrix_a_mle: DenseMle<Fr, Fr> = DenseMle::new_from_raw(matrix_a_vec, LayerId::Input(0), None);
         let matrix_b_mle: DenseMle<Fr, Fr> = DenseMle::new_from_raw(matrix_b_vec, LayerId::Input(0), None);
 
-        let matrix_a: Matrix<Fr> = Matrix::new(matrix_a_mle.mle_ref(), 1, 1);
-        let matrix_b: Matrix<Fr> = Matrix::new(matrix_b_mle.mle_ref(), 1, 1);
+        let matrix_a: Matrix<Fr> = Matrix::new(matrix_a_mle.mle_ref(), 1, 1, None);
+        let matrix_b: Matrix<Fr> = Matrix::new(matrix_b_mle.mle_ref(), 1, 1, None);
 
         let mut matrix_init: MatMult<Fr, PoseidonTranscript<Fr>> = MatMult::new(
             LayerId::Input(0),
@@ -688,8 +692,8 @@ mod test {
         let matrix_a_mle: DenseMle<Fr, Fr> = DenseMle::new_from_raw(matrix_a_vec, LayerId::Input(0), None);
         let matrix_b_mle: DenseMle<Fr, Fr> = DenseMle::new_from_raw(matrix_b_vec, LayerId::Input(0), None);
 
-        let matrix_a: Matrix<Fr> = Matrix::new(matrix_a_mle.mle_ref(), 1, 2);
-        let matrix_b: Matrix<Fr> = Matrix::new(matrix_b_mle.mle_ref(), 2, 0);
+        let matrix_a: Matrix<Fr> = Matrix::new(matrix_a_mle.mle_ref(), 1, 2, None);
+        let matrix_b: Matrix<Fr> = Matrix::new(matrix_b_mle.mle_ref(), 2, 0, None);
 
         let mut matrix_init: MatMult<Fr, PoseidonTranscript<Fr>> = MatMult::new(
             LayerId::Input(0),
