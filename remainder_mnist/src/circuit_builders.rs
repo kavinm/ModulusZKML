@@ -11,10 +11,10 @@ use remainder::mle::MleIndex;
 /// 
 /// This builder computes the positive binary recomposition
 /// \sum_{b_1, ... b_{15}} 2^{15 - i} * b_i
-pub struct BinaryRecompBuilder<F: FieldExt> {
+pub struct PositiveBinaryRecompBuilder<F: FieldExt> {
     diff_signed_bin_decomp: DenseMle<F, BinDecomp16Bit<F>>,
 }
-impl<F: FieldExt> LayerBuilder<F> for BinaryRecompBuilder<F> {
+impl<F: FieldExt> LayerBuilder<F> for PositiveBinaryRecompBuilder<F> {
     type Successor = DenseMle<F, F>;
 
     fn build_expression(&self) -> ExpressionStandard<F> {
@@ -55,7 +55,7 @@ impl<F: FieldExt> LayerBuilder<F> for BinaryRecompBuilder<F> {
         DenseMle::new_from_iter(result_iter, id, prefix_bits)
     }
 }
-impl<F: FieldExt> BinaryRecompBuilder<F> {
+impl<F: FieldExt> PositiveBinaryRecompBuilder<F> {
     /// Constructor
     pub fn new(diff_signed_bin_decomp: DenseMle<F, BinDecomp16Bit<F>>) -> Self {
         Self {

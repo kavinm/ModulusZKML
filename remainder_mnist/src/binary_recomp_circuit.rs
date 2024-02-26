@@ -3,7 +3,7 @@ use itertools::{repeat_n, Itertools};
 use remainder::{layer::{batched::{combine_zero_mle_ref, BatchedLayer}, LayerId}, mle::{dense::DenseMle, structs::BinDecomp16Bit, Mle, MleIndex, MleRef}, prover::{input_layer::{combine_input_layers::InputLayerBuilder, ligero_input_layer::LigeroInputLayer, InputLayer}, GKRCircuit, Layers, Witness}};
 use remainder_shared_types::{transcript::{poseidon_transcript::PoseidonTranscript, Transcript}, FieldExt, Fr};
 
-use crate::{circuit_builders::{BinaryRecompBuilder, BinaryRecompCheckerBuilder}, utils::{generate_16_bit_decomp, generate_16_bit_decomp_signed}};
+use crate::{circuit_builders::{PositiveBinaryRecompBuilder, BinaryRecompCheckerBuilder}, utils::{generate_16_bit_decomp, generate_16_bit_decomp_signed}};
 
 /// Batched version of the binary recomposition circuit (see below)!
 pub struct BinaryRecompCircuit<F: FieldExt> {
@@ -44,7 +44,7 @@ impl<F: FieldExt> GKRCircuit<F> for BinaryRecompCircuit<F> {
                     ).collect_vec()
                 )
             );
-            BinaryRecompBuilder::new(signed_bin_decomp_mle.clone())
+            PositiveBinaryRecompBuilder::new(signed_bin_decomp_mle.clone())
         }).collect();
 
         let batched_bin_recomp_builder = BatchedLayer::new(pos_bin_recomp_builders);
