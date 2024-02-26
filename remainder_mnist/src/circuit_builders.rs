@@ -74,8 +74,8 @@ impl<F: FieldExt> BinaryRecompBuilder<F> {
 /// Note that this is equivalent to
 /// (1 - b_s)(`pos_recomp` - `diff`) + `b_s`(`pos_recomp` + `diff`)
 pub struct BinaryRecompCheckerBuilder<F: FieldExt> {
-    input_path_diff_mle: DenseMle<F, F>,
-    diff_signed_bit_decomp_mle: DenseMle<F, BinDecomp16Bit<F>>,
+    mle: DenseMle<F, F>,
+    signed_bit_decomp_mle: DenseMle<F, BinDecomp16Bit<F>>,
     positive_recomp_mle: DenseMle<F, F>,
 }
 impl<F: FieldExt> LayerBuilder<F> for BinaryRecompCheckerBuilder<F> {
@@ -85,8 +85,8 @@ impl<F: FieldExt> LayerBuilder<F> for BinaryRecompCheckerBuilder<F> {
 
         // --- Grab MLE refs ---
         let positive_recomp_mle_ref = self.positive_recomp_mle.mle_ref();
-        let signed_bit_mle_ref = self.diff_signed_bit_decomp_mle.mle_bit_refs()[self.diff_signed_bit_decomp_mle.mle_bit_refs().len() - 1].clone();
-        let diff_mle_ref = self.input_path_diff_mle.mle_ref();
+        let signed_bit_mle_ref = self.signed_bit_decomp_mle.mle_bit_refs()[self.signed_bit_decomp_mle.mle_bit_refs().len() - 1].clone();
+        let diff_mle_ref = self.mle.mle_ref();
 
         // --- LHS of addition ---
         let pos_recomp_minus_diff = ExpressionStandard::Mle(positive_recomp_mle_ref) - ExpressionStandard::Mle(diff_mle_ref.clone());
@@ -126,13 +126,13 @@ impl<F: FieldExt> LayerBuilder<F> for BinaryRecompCheckerBuilder<F> {
 impl<F: FieldExt> BinaryRecompCheckerBuilder<F> {
     /// Constructor
     pub fn new(
-        input_path_diff_mle: DenseMle<F, F>,
-        diff_signed_bit_decomp_mle: DenseMle<F, BinDecomp16Bit<F>>,
+        mle: DenseMle<F, F>,
+        signed_bit_decomp_mle: DenseMle<F, BinDecomp16Bit<F>>,
         positive_recomp_mle: DenseMle<F, F>,
     ) -> Self {
         Self {
-            input_path_diff_mle,
-            diff_signed_bit_decomp_mle,
+            mle,
+            signed_bit_decomp_mle,
             positive_recomp_mle
         }
     }
