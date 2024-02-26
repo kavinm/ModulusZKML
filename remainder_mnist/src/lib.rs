@@ -1,6 +1,6 @@
 
 
-// pub mod relu_circuit;
+pub mod relu_circuit;
 
 pub mod bits_are_binary_circuit;
 
