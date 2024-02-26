@@ -93,13 +93,9 @@ impl<F: FieldExt, Tr: Transcript<F>> MatMult<F, Tr> {
             // TODO: raise error
         }
 
-        println!("matrix_a_mle_ref {:?}", matrix_a_mle_ref.mle_indices());
-
         let transpose_timer = start_timer!(|| "transpose matrix");
         let mut matrix_a_transp = gen_transpose_matrix(&matrix_a_mle_ref, num_rows_a, num_cols_a, self.matrix_a.prefix_bits.clone());
         end_timer!(transpose_timer);
-
-        println!("matrix_a_transp {:?}", matrix_a_transp.mle_indices());
 
         matrix_a_transp.index_mle_indices(0);
         matrix_b_mle_ref.index_mle_indices(0);
@@ -112,8 +108,6 @@ impl<F: FieldExt, Tr: Transcript<F>> MatMult<F, Tr> {
             }
         );
         let mut bound_indices_a = vec![];
-
-        println!("matrix_a_transp.mle_indices {:?}", matrix_a_transp.mle_indices.clone());
 
         let new_a_indices = matrix_a_transp.mle_indices.clone().into_iter().filter_map(
             |index: MleIndex<F>| {
@@ -129,7 +123,6 @@ impl<F: FieldExt, Tr: Transcript<F>> MatMult<F, Tr> {
             }
         ).collect_vec();
 
-        println!("new_a_indices {:?}", new_a_indices.clone());
         self.matrix_a.mle_ref = DenseMle::new_from_raw(matrix_a_transp.bookkeeping_table().clone().to_vec(), matrix_a_transp.layer_id, None).mle_ref();
         self.matrix_a.mle_ref.mle_indices = new_a_indices.into_iter().chain(bound_indices_a.into_iter()).collect_vec();
         self.matrix_a.mle_ref.index_mle_indices(0);
@@ -265,9 +258,6 @@ impl<F: FieldExt, Tr: Transcript<F>> Layer<F> for MatMult<F, Tr> {
         claim: Claim<F>,
         transcript: &mut Self::Transcript,
     ) -> Result<SumcheckProof<F>, LayerError> {
-
-        println!("matrix_a's prefix bits: {:?}", self.matrix_a.mle_ref.original_mle_indices());
-        println!("matrix_b's prefix bits: {:?}", self.matrix_b.mle_ref.original_mle_indices());
         
         let mut claim_b = claim.get_point().clone();
         let claim_a = claim_b.split_off(self.matrix_b.num_cols_vars);
@@ -396,9 +386,6 @@ impl<F: FieldExt, Tr: Transcript<F>> Layer<F> for MatMult<F, Tr> {
     /// Get the claims that this layer makes on other layers
     fn get_claims(&self) -> Result<Vec<Claim<F>>, LayerError> {
 
-        println!("again matrix_a's prefix bits: {:?}", self.matrix_a.mle_ref.original_mle_indices());
-        println!("again matrix_b's prefix bits: {:?}", self.matrix_b.mle_ref.original_mle_indices());
-
        let claims = vec![&self.matrix_a, &self.matrix_b].into_iter().map(
             |matrix| {
                 let matrix_fixed_indices = matrix.mle_ref.mle_indices().into_iter().map(
@@ -407,7 +394,6 @@ impl<F: FieldExt, Tr: Transcript<F>> Layer<F> for MatMult<F, Tr> {
                     }
                 ).collect_vec();
 
-                println!("matrix_fixed_indices: {:?}", matrix_fixed_indices);
                 let matrix_val = matrix.mle_ref.bookkeeping_table()[0];
                 let claim: Claim<F> = Claim::new(
                     matrix_fixed_indices,

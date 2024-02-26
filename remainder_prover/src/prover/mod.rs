@@ -390,8 +390,6 @@ pub trait GKRCircuit<F: FieldExt> {
 
         end_timer!(claims_timer);
 
-        println!("Claims: {:#?}", claims);
-
         let intermediate_layers_timer = start_timer!(|| "ALL intermediate layers proof generation");
 
         // Count the total number of wlx evaluations for benchmarking purposes.
@@ -503,8 +501,6 @@ pub trait GKRCircuit<F: FieldExt> {
                     "After sumcheck, I have the following claims: {:#?}",
                     post_sumcheck_new_claims
                 );
-
-                println!("new Claims: {:#?}", post_sumcheck_new_claims);
 
                 for claim in post_sumcheck_new_claims {
                     if let Some(curr_claims) = claims.get_mut(&claim.get_to_layer_id().unwrap()) {
