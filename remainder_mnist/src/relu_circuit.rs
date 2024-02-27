@@ -22,6 +22,13 @@ impl<F: FieldExt> GKRCircuit<F> for ReluCircuit<F> {
         let mut combined_mles = DenseMle::<F, F>::combine_mle_batch(self.mles.clone());
         let mut combined_signed_bin_decomp_mles = DenseMle::<F, BinDecomp16Bit<F>>::combine_mle_batch(self.signed_bin_decomp_mles.clone());
 
+        // --- Inputs to the circuit are just these two MLEs ---
+        let input_mles: Vec<Box<&mut dyn Mle<F>>> = vec![Box::new(&mut combined_mles), Box::new(&mut combined_signed_bin_decomp_mles)];
+        let input_layer_builder = InputLayerBuilder::new(input_mles, None, LayerId::Input(0));
+
+        // --- Create input layers ---
+        let live_committed_input_layer: LigeroInputLayer<F, Self::Transcript> = input_layer_builder.to_input_layer_with_rho_inv(4_u8, 1_f64);
+
         // --- Dataparallel/batching stuff + sanitychecks ---
         let num_subcircuit_copies = self.signed_bin_decomp_mles.len();
         let num_dataparallel_bits = log2(num_subcircuit_copies) as usize;
@@ -48,13 +55,6 @@ impl<F: FieldExt> GKRCircuit<F> for ReluCircuit<F> {
                 )
             );
         }
-
-        // --- Inputs to the circuit are just these two MLEs ---
-        let input_mles: Vec<Box<&mut dyn Mle<F>>> = vec![Box::new(&mut combined_mles), Box::new(&mut combined_signed_bin_decomp_mles)];
-        let input_layer_builder = InputLayerBuilder::new(input_mles, None, LayerId::Input(0));
-
-        // --- Create input layers ---
-        let live_committed_input_layer: LigeroInputLayer<F, Self::Transcript> = input_layer_builder.to_input_layer_with_rho_inv(4_u8, 1_f64);
 
         // --- Create `Layers` struct to add layers to ---
         let mut layers: Layers<F, Self::Transcript> = Layers::new();
