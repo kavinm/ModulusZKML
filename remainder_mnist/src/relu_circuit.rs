@@ -27,18 +27,9 @@ impl<F: FieldExt> GKRCircuit<F> for ReluCircuit<F> {
         let num_dataparallel_bits = log2(num_subcircuit_copies) as usize;
         debug_assert_eq!(num_dataparallel_bits, log2(self.mles.len()) as usize);
 
-        // --- Inputs to the circuit are just these two MLEs ---
-        let input_mles: Vec<Box<&mut dyn Mle<F>>> = vec![Box::new(&mut combined_mles), Box::new(&mut combined_signed_bin_decomp_mles)];
-        let input_layer_builder = InputLayerBuilder::new(input_mles, None, LayerId::Input(0));
-
-        // --- Create input layers ---
-        let live_committed_input_layer: LigeroInputLayer<F, Self::Transcript> = input_layer_builder.to_input_layer_with_rho_inv(4_u8, 1_f64);
-
-        // --- Create `Layers` struct to add layers to ---
-        let mut layers: Layers<F, Self::Transcript> = Layers::new();
-
-        // --- First we create the positive binary recomp builder ---
-        let pos_bin_recomp_builders = self.signed_bin_decomp_mles.iter_mut().map(|signed_bin_decomp_mle| {
+        // --- set the prefix bits with regard to the dataparallel_bits ---
+        // --- Prefix bits should be [input_prefix_bits], [dataparallel_bits] ---
+        for signed_bin_decomp_mle in self.signed_bin_decomp_mles.iter_mut() {
             // --- Prefix bits should be [input_prefix_bits], [dataparallel_bits] ---
             // TODO!(ryancao): Note that strictly speaking we shouldn't be adding dataparallel bits but need to for
             // now for a specific batching scenario
@@ -49,11 +40,7 @@ impl<F: FieldExt> GKRCircuit<F> for ReluCircuit<F> {
                     ).collect_vec()
                 )
             );
-            PositiveBinaryRecompBuilder::new(signed_bin_decomp_mle.clone())
-        }).collect();
-
-        let batched_bin_recomp_builder = BatchedLayer::new(pos_bin_recomp_builders);
-
+        }
         for mle in self.mles.iter_mut() {
             mle.set_prefix_bits(Some(
                 combined_mles.get_prefix_bits().iter().flatten().cloned().chain(
@@ -62,36 +49,76 @@ impl<F: FieldExt> GKRCircuit<F> for ReluCircuit<F> {
             ));
         }
 
+        // --- Inputs to the circuit are just these two MLEs ---
+        let input_mles: Vec<Box<&mut dyn Mle<F>>> = vec![Box::new(&mut combined_mles), Box::new(&mut combined_signed_bin_decomp_mles)];
+        let input_layer_builder = InputLayerBuilder::new(input_mles, None, LayerId::Input(0));
+
+        // --- Create input layers ---
+        let live_committed_input_layer: LigeroInputLayer<F, Self::Transcript> = input_layer_builder.to_input_layer_with_rho_inv(4_u8, 1_f64);
+
+        // --- Create `Layers` struct to add layers to ---
+        let mut layers: Layers<F, Self::Transcript> = Layers::new();
+
+        // **************************** BEGIN: checking the bits recompute to the mles ****************************
+
+        // --- First we create the positive binary recomp builder ---
+        let pos_bin_recomp_builders = self.signed_bin_decomp_mles.iter_mut().map(|signed_bin_decomp_mle| {
+            PositiveBinaryRecompBuilder::new(signed_bin_decomp_mle.clone())
+        }).collect();
+
+        let batched_bin_recomp_builder = BatchedLayer::new(pos_bin_recomp_builders);
         let batched_pos_bin_recomp_mle = layers.add_gkr(batched_bin_recomp_builder);
 
         // --- Finally, the recomp checker ---
-        let batched_recomp_checker_builder = BatchedLayer::new(
+        let recomp_checker_builders = BatchedLayer::new(
             self.signed_bin_decomp_mles.iter_mut().zip(
                 batched_pos_bin_recomp_mle.into_iter().zip(
                     self.mles.clone().into_iter()
                 )
             )
-            .map(|(signed_bit_decomp_mle, (pos_bin_recomp_mle, raw_diff_mle))| {
+            .map(|(signed_bit_decomp_mle, (positive_recomp_mle, raw_diff_mle))| {
 
                 BinaryRecompCheckerBuilder::new(
                     raw_diff_mle,
                     signed_bit_decomp_mle.clone(),
-                    pos_bin_recomp_mle,
+                    positive_recomp_mle,
                 )
             }
         ).collect_vec());
 
         // --- Grab output layer and flatten ---
-        let batched_recomp_checker_result_mle = layers.add_gkr(batched_recomp_checker_builder);
-        let flattened_batched_recomp_checker_result_mle = combine_zero_mle_ref(batched_recomp_checker_result_mle);
+        let recomp_checker_results = combine_zero_mle_ref(layers.add_gkr(recomp_checker_builders));
 
-        // ---- checking the bits are binary ---
+        // **************************** END: checking the bits recompute to the mles ****************************
 
+        // **************************** BEGIN: checking the bits are binary ****************************
 
+        // --- Create the builders for (b_i)^2 - b_i ---
+        let bits_are_binary_builders = self.signed_bin_decomp_mles.iter_mut().map(|signed_bin_decomp_mle| {
+            
+            from_mle(
+                signed_bin_decomp_mle, 
+                |signed_bin_decomp_mle| {
+                    let combined_bin_decomp_mle_ref = signed_bin_decomp_mle.get_entire_mle_as_mle_ref();
+                    ExpressionStandard::Product(vec![combined_bin_decomp_mle_ref.clone(), combined_bin_decomp_mle_ref.clone()]) - ExpressionStandard::Mle(combined_bin_decomp_mle_ref)
+                }, 
+                |mle, id, prefix_bits| {
+                    ZeroMleRef::new(mle.num_iterated_vars(), prefix_bits, id)
+            })
+        }).collect_vec();
 
-        // ---- checking the bits are binary ---
+        let bits_are_binary_results = combine_zero_mle_ref(layers.add_gkr(BatchedLayer::new(bits_are_binary_builders)));
 
-        Witness { layers, output_layers: vec![flattened_batched_recomp_checker_result_mle.get_enum()], input_layers: vec![live_committed_input_layer.to_enum()] }
+        // **************************** END: checking the bits are binary ****************************
+
+        Witness {
+            layers,
+            output_layers: vec![
+                recomp_checker_results.get_enum(),
+                bits_are_binary_results.get_enum(),
+            ],
+            input_layers: vec![live_committed_input_layer.to_enum()]
+        }
     }
 }
 
