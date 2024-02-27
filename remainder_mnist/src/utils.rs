@@ -255,8 +255,9 @@ pub fn load_dummy_mnist_input_and_weights(
     MNISTWeights<Fr>,
     MNISTInputData<Fr>,
 ) {
-
-    todo!()
+    let mnist_weights = load_dummy_mnist_model_weights(l1_dim, l2_dim);
+    let mnist_input_data = load_dummy_mnist_input_data(mnist_weights.l1_linear_weights, input_dim);
+    (mnist_weights, mnist_input_data)
 }
 
 
