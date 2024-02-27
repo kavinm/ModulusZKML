@@ -1,9 +1,9 @@
 use ark_std::test_rng;
 use itertools::Itertools;
 use rand::Rng;
+use rayon::str;
 use remainder::{layer::LayerId, mle::{dense::DenseMle, structs::BinDecomp16Bit}};
-use remainder_shared_types::FieldExt;
-
+use remainder_shared_types::{FieldExt, Fr};
 
 
 pub fn recompute_16_bit_decomp<F: FieldExt>(
@@ -125,4 +125,79 @@ pub fn generate_16_bit_decomp_signed<F: FieldExt>(
 
     (mle_bin_decomp_16_bits, mle_bin_decomp_recomp)
 
+}
+
+pub struct NNLinearWeights<F: FieldExt> {
+    pub weights_mle: DenseMle<F, F>,    // represent matrix on the right, note this is the A^T matrix from: https://pytorch.org/docs/stable/generated/torch.nn.Linear.html
+                                        // ^ its shape is (in_features, out_features)
+    pub biases_mle: DenseMle<F, F>,     // represent the biases, shape (out_features,)
+    pub in_features: usize,
+    pub out_features: usize,
+}
+
+pub struct MNISTWeights<F: FieldExt> {
+    pub l1_linear_weights: NNLinearWeights<F>,
+    pub l2_linear_weights: NNLinearWeights<F>,
+}
+
+type ReluWitness<F> = Vec<DenseMle<F, BinDecomp16Bit<F>>>;
+
+pub struct MNISTInputData<F: FieldExt> {
+    pub input_mle: DenseMle<F, F>,      // represent the input matrix has shape (sample_size, features)
+    pub sample_size: usize,
+    pub relu_bin_decomp: ReluWitness<F>,
+}
+
+pub struct NNLinearDimension {
+    pub in_features: usize,
+    pub out_features: usize,
+}
+
+pub fn gen_random_nn_linear_weights<F: FieldExt>(
+    dim: NNLinearDimension,
+) -> NNLinearWeights<F> {
+    let mut rng = test_rng();
+
+    let weights_mle: DenseMle<F, F> = DenseMle::new_from_iter(
+        (0.. (dim.in_features * dim.out_features)).map(|_| F::from(rng.gen::<u64>()).into()),
+        LayerId::Input(0),
+        None,
+    );
+
+    let biases_mle: DenseMle<F, F> = DenseMle::new_from_iter(
+        (0..1 << dim.out_features).map(|_| F::from(rng.gen::<u64>()).into()),
+        LayerId::Input(0),
+        None,
+    );
+
+    NNLinearWeights {
+        weights_mle,
+        biases_mle,
+        in_features: dim.in_features,
+        out_features: dim.out_features,
+    }
+}
+
+pub fn load_dummy_mnist_model_weights(
+    l1_dim: NNLinearDimension,
+    l2_dim: NNLinearDimension,
+) -> MNISTWeights<Fr> {
+
+    MNISTWeights {
+        l1_linear_weights: gen_random_nn_linear_weights(l1_dim),
+        l2_linear_weights: gen_random_nn_linear_weights(l2_dim),
+    }
+    
+}
+
+pub fn load_dummy_mnist_input_data() -> () {
+    todo!()
+}
+
+pub fn load_mnist_model_weights() -> () {
+    todo!()
+}
+
+pub fn load_mnist_input_data() -> () {
+    todo!()
 }
