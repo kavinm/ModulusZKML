@@ -11,3 +11,5 @@ pub mod utils;
 pub mod binary_recomp_circuit;
 
 pub mod circuit_builders;
+
+pub mod data_pipeline;

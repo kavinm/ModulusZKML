@@ -5,6 +5,8 @@ use rayon::str;
 use remainder::{layer::LayerId, mle::{dense::DenseMle, structs::BinDecomp16Bit}};
 use remainder_shared_types::{FieldExt, Fr};
 
+use crate::data_pipeline::{MNISTWeights, NNLinearDimension, NNLinearWeights};
+
 
 pub fn recompute_16_bit_decomp<F: FieldExt>(
     decomp_bits: &[F; 16],
@@ -127,32 +129,6 @@ pub fn generate_16_bit_decomp_signed<F: FieldExt>(
 
 }
 
-pub struct NNLinearWeights<F: FieldExt> {
-    pub weights_mle: DenseMle<F, F>,    // represent matrix on the right, note this is the A^T matrix from: https://pytorch.org/docs/stable/generated/torch.nn.Linear.html
-                                        // ^ its shape is (in_features, out_features)
-    pub biases_mle: DenseMle<F, F>,     // represent the biases, shape (out_features,)
-    pub in_features: usize,
-    pub out_features: usize,
-}
-
-pub struct MNISTWeights<F: FieldExt> {
-    pub l1_linear_weights: NNLinearWeights<F>,
-    pub l2_linear_weights: NNLinearWeights<F>,
-}
-
-type ReluWitness<F> = Vec<DenseMle<F, BinDecomp16Bit<F>>>;
-
-pub struct MNISTInputData<F: FieldExt> {
-    pub input_mle: DenseMle<F, F>,      // represent the input matrix has shape (sample_size, features)
-    pub sample_size: usize,
-    pub relu_bin_decomp: ReluWitness<F>,
-}
-
-pub struct NNLinearDimension {
-    pub in_features: usize,
-    pub out_features: usize,
-}
-
 pub fn gen_random_nn_linear_weights<F: FieldExt>(
     dim: NNLinearDimension,
 ) -> NNLinearWeights<F> {
@@ -173,8 +149,7 @@ pub fn gen_random_nn_linear_weights<F: FieldExt>(
     NNLinearWeights {
         weights_mle,
         biases_mle,
-        in_features: dim.in_features,
-        out_features: dim.out_features,
+        dim,
     }
 }
 
