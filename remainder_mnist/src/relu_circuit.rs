@@ -1,9 +1,9 @@
 use ark_std::log2;
 use itertools::{repeat_n, Itertools};
 use remainder::{expression::ExpressionStandard, layer::{batched::{combine_zero_mle_ref, BatchedLayer}, from_mle, LayerId}, mle::{dense::DenseMle, structs::BinDecomp16Bit, zero::ZeroMleRef, Mle, MleIndex, MleRef}, prover::{input_layer::{combine_input_layers::InputLayerBuilder, ligero_input_layer::LigeroInputLayer, public_input_layer::PublicInputLayer, InputLayer}, GKRCircuit, Layers, Witness}};
-use remainder_shared_types::{transcript::poseidon_transcript::PoseidonTranscript, FieldExt};
+use remainder_shared_types::{transcript::{poseidon_transcript::PoseidonTranscript, Transcript}, FieldExt, Fr};
 
-use crate::circuit_builders::{PositiveBinaryRecompBuilder, BinaryRecompCheckerBuilder};
+use crate::{circuit_builders::{BinaryRecompCheckerBuilder, PositiveBinaryRecompBuilder}, utils::generate_16_bit_decomp_signed};
 
 
 pub struct ReluCircuit<F: FieldExt> {
@@ -29,6 +29,13 @@ impl<F: FieldExt> GKRCircuit<F> for ReluCircuit<F> {
 
         // --- set the prefix bits with regard to the dataparallel_bits ---
         // --- Prefix bits should be [input_prefix_bits], [dataparallel_bits] ---
+        for mle in self.mles.iter_mut() {
+            mle.set_prefix_bits(Some(
+                combined_mles.get_prefix_bits().iter().flatten().cloned().chain(
+                    repeat_n(MleIndex::Iterated, num_dataparallel_bits)
+                ).collect_vec()
+            ));
+        }
         for signed_bin_decomp_mle in self.signed_bin_decomp_mles.iter_mut() {
             // --- Prefix bits should be [input_prefix_bits], [dataparallel_bits] ---
             // TODO!(ryancao): Note that strictly speaking we shouldn't be adding dataparallel bits but need to for
@@ -40,13 +47,6 @@ impl<F: FieldExt> GKRCircuit<F> for ReluCircuit<F> {
                     ).collect_vec()
                 )
             );
-        }
-        for mle in self.mles.iter_mut() {
-            mle.set_prefix_bits(Some(
-                combined_mles.get_prefix_bits().iter().flatten().cloned().chain(
-                    repeat_n(MleIndex::Iterated, num_dataparallel_bits)
-                ).collect_vec()
-            ));
         }
 
         // --- Inputs to the circuit are just these two MLEs ---
@@ -132,6 +132,39 @@ impl<F: FieldExt> ReluCircuit<F> {
         Self {
             mles,
             signed_bin_decomp_mles,
+        }
+    }
+}
+
+#[test]
+fn test_relu_circuit() {
+
+    // generate a random 16 bits, compute the number from the decomposition
+    let (
+        binary_decomp_mle_vec,
+        binary_recomp_mle_vec
+    ) = generate_16_bit_decomp_signed::<Fr>(4, 2);
+
+    let mut circuit = ReluCircuit::new(
+        binary_recomp_mle_vec,
+        binary_decomp_mle_vec,
+    );
+
+    let mut transcript = PoseidonTranscript::new("Relu Circuit Transcript");
+    let proof = circuit.prove(&mut transcript);
+
+    match proof {
+        Ok(proof) => {
+            let mut transcript = PoseidonTranscript::new("Relu Circuit Transcript");
+            let result = circuit.verify(&mut transcript, proof);
+            if let Err(err) = result {
+                println!("{}", err);
+                panic!();
+            }
+        },
+        Err(err) => {
+            println!("{}", err);
+            panic!();
         }
     }
 }
