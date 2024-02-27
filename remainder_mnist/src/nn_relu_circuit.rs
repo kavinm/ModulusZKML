@@ -22,7 +22,7 @@ impl<F: FieldExt> GKRCircuit<F> for ReluCircuit<F> {
 
         // --- Inputs to the circuit are just these two MLEs ---
         let input_mles: Vec<Box<&mut dyn Mle<F>>> = vec![Box::new(&mut self.relu_in), Box::new(&mut self.signed_bin_decomp_mle)];
-        let input_layer_builder = InputLayerBuilder::new(input_mles, Some(vec![self.relu_in.num_iterated_vars()]), LayerId::Input(0));
+        let input_layer_builder = InputLayerBuilder::new(input_mles, None, LayerId::Input(0));
 
         // --- Create input layers ---
         let live_committed_input_layer: LigeroInputLayer<F, Self::Transcript> = input_layer_builder.to_input_layer_with_rho_inv(4_u8, 1_f64);
@@ -51,7 +51,7 @@ impl<F: FieldExt> GKRCircuit<F> for ReluCircuit<F> {
         // **************************** BEGIN: checking the bits are binary ****************************
 
         // --- Create the builders for (b_i)^2 - b_i ---
-        let bits_are_binary_builder = BitsAreBinaryBuilder::new(self.signed_bin_decomp_mle);
+        let bits_are_binary_builder = BitsAreBinaryBuilder::new(self.signed_bin_decomp_mle.clone());
         let bits_are_binary_result = layers.add_gkr(bits_are_binary_builder);
 
         // **************************** END: checking the bits are binary ****************************
@@ -60,12 +60,12 @@ impl<F: FieldExt> GKRCircuit<F> for ReluCircuit<F> {
 
         // --- Create the builders for (1 - b_i) * x_i ---
         // ---   this simplifies to x_i - b_i * x_i    ---
-        let relu_builder = ReLUBuilder::new(self.signed_bin_decomp_mle, self.relu_in);
+        let relu_builder = ReLUBuilder::new(self.signed_bin_decomp_mle.clone(), self.relu_in.clone());
         let relu_result = layers.add_gkr(relu_builder);
 
         // --- Finally, need to subtract relu result from itself to get ZeroMleRef lol ---
-        let self_sub_builder = SelfSubtractBuilder::new(relu_result);
-        let final_result = layers.add_gkr(self_sub_builder);
+        // let self_sub_builder = SelfSubtractBuilder::new(relu_result);
+        // let final_result = layers.add_gkr(self_sub_builder);
 
         // **************************** END: the actual relu circuit ****************************
 
@@ -74,7 +74,7 @@ impl<F: FieldExt> GKRCircuit<F> for ReluCircuit<F> {
             output_layers: vec![
                 recomp_checker_result.get_enum(),
                 bits_are_binary_result.get_enum(),
-                final_result.get_enum(),
+                relu_result.mle_ref().get_enum(),
             ],
             input_layers: vec![live_committed_input_layer.to_enum()]
         }

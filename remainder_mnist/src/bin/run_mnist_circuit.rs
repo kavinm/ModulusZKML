@@ -213,49 +213,5 @@ fn main() -> Result<(), MatMulBinaryError> {
     // // --- Log the args ---
     let args_as_string = format!("{:?}", args);
     debug!(args_as_string);
-
-    let (trees_batched_data, (tree_height, input_len), minibatch_data) =
-        load_upshot_data_multi_tree_batch::<Fr>(
-            maybe_minibatch_data.clone(),
-            args.tree_batch_size,
-            args.tree_batch_number,
-            Path::new(&args.decision_forest_model_filepath),
-            Path::new(&args.quantized_samples_filepath),
-        );
-
-    // // --- Sanitycheck (check if the tree commitment exists) ---
-
-    let tree_commit_filepath = get_tree_commitment_filepath_for_tree_batch(
-        args.tree_batch_size,
-        args.tree_batch_number,
-        Path::new(&args.tree_commit_dir),
-    );
-    debug!(
-        tree_commit_filepath,
-        "Attempting to find the tree commit file"
-    );
-    if let Err(_) = fs::metadata(&tree_commit_filepath) {
-        return Err(MatMulBinaryError::NoTreeCommitmentFile);
-    }
-
-    // --- Create the full ZKDT circuit ---
-    // multi tree ZKDT circuit
-    let full_zkdt_circuit = ZKDTMultiTreeCircuit {
-        batched_zkdt_circuit_mles_tree: tree_batched_circuit_mles,
-        tree_precommit_filepath: tree_commit_filepath,
-        rho_inv: args.rho_inv,
-        ratio: args.matrix_ratio,
-    };
-
-    // // --- Grab the proof filepath to write to and compute the circuit + prove ---
-    // let maybe_proof_filepath = args
-    //     .gkr_proof_to_be_written_filepath
-    //     .map(|maybe_path| Path::new(&maybe_path).to_owned());
-    // run_mnist_circuit(
-    //     full_zkdt_circuit,
-    //     maybe_proof_filepath,
-    //     args.verify_proof,
-    //     args.tree_batch_size,
-    // )
     todo!()
 }

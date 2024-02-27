@@ -10,7 +10,7 @@ impl<F: FieldExt> LayerBuilder<F> for BitsAreBinaryBuilder<F> {
 
     fn build_expression(&self) -> ExpressionStandard<F> {
         let signed_bit_mle_ref = self.signed_bin_decomp_mle.get_entire_mle_as_mle_ref();
-        ExpressionStandard::Mle(signed_bit_mle_ref) - ExpressionStandard::Product(vec![signed_bit_mle_ref, signed_bit_mle_ref])
+        ExpressionStandard::Mle(signed_bit_mle_ref.clone()) - ExpressionStandard::Product(vec![signed_bit_mle_ref.clone(), signed_bit_mle_ref.clone()])
     }
 
     fn next_layer(&self, id: remainder::layer::LayerId, prefix_bits: Option<Vec<remainder::mle::MleIndex<F>>>) -> Self::Successor {
