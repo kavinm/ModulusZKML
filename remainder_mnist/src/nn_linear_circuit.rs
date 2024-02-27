@@ -2,7 +2,7 @@ use std::path::Path;
 
 use ark_std::{log2, test_rng};
 use rand::Rng;
-use remainder::{layer::{matmult::Matrix, LayerId}, mle::{dense::DenseMle, Mle, MleRef}, prover::{helpers::test_circuit, input_layer::{combine_input_layers::InputLayerBuilder, enum_input_layer::InputLayerEnum, ligero_input_layer::LigeroInputLayer, InputLayer}, GKRCircuit, GKRError, Layers, Witness}};
+use remainder::{expression::ExpressionStandard, layer::{from_mle, matmult::Matrix, LayerId}, mle::{dense::DenseMle, Mle, MleRef}, prover::{helpers::test_circuit, input_layer::{combine_input_layers::InputLayerBuilder, enum_input_layer::InputLayerEnum, ligero_input_layer::LigeroInputLayer, InputLayer}, GKRCircuit, GKRError, Layers, Witness}};
 use remainder_shared_types::{transcript::poseidon_transcript::PoseidonTranscript, FieldExt, Fr};
 
 
@@ -11,6 +11,7 @@ pub struct LinearCircuit<F: FieldExt> {
     pub input_mle: DenseMle<F, F>,      // represent matrix on the left, shape (sample_size, in_features)
     pub weights_mle: DenseMle<F, F>,    // represent matrix on the right, note this is the A^T matrix from: https://pytorch.org/docs/stable/generated/torch.nn.Linear.html
                                         // ^ its shape is (in_features, out_features)
+    pub biases_mle: DenseMle<F, F>,     // represent the biases, shape (out_features,)
     pub sample_size: usize,
     pub in_features: usize,
     pub out_features: usize,
@@ -24,6 +25,7 @@ impl<F: FieldExt> GKRCircuit<F> for LinearCircuit<F> {
         let input_mles_commit: Vec<Box<&mut dyn Mle<F>>> = vec![
             Box::new(&mut self.input_mle),
             Box::new(&mut self.weights_mle),
+            Box::new(&mut self.biases_mle),
         ];
 
         let input_mles_commit_builder =
@@ -57,7 +59,24 @@ impl<F: FieldExt> GKRCircuit<F> for LinearCircuit<F> {
 
         let matmult_out = layers.add_matmult_layer(input_matrix, weights_matrix);
 
-        let output_layers = vec![matmult_out.mle_ref().get_enum()];
+        let relu_builder = from_mle(
+                (matmult_out, self.biases_mle.clone()), 
+                |(matmult_out, biases_mle)| {
+                    ExpressionStandard::Mle(matmult_out.mle_ref()) + ExpressionStandard::Mle(biases_mle.mle_ref())
+                },
+                |(matmult_out, biases_mle), id, prefix_bits| {
+
+                    let result_iter = matmult_out.into_iter()
+                        .zip(biases_mle.into_iter().cycle())
+                        .map(|(matmult_out_f, biases_mle_f)| {
+                            matmult_out_f + biases_mle_f
+                        });
+                    DenseMle::new_from_iter(result_iter, id, prefix_bits)
+            });
+
+        let relu_results = layers.add_gkr(relu_builder);
+
+        let output_layers = vec![relu_results.mle_ref().get_enum()];
 
         Witness {
             layers,
@@ -84,9 +103,16 @@ fn test_matmul_circuit() {
         None,
     );  // weights_mle's shape is (8, 4) -> (in_features, out_features)
 
+    let biases_mle: DenseMle<Fr, Fr> = DenseMle::new_from_iter(
+        (0..1 << 2).map(|_| Fr::from(rng.gen::<u64>()).into()),
+        LayerId::Input(0),
+        None,
+    );  // weights_mle's shape is (1, 4) -> (, out_features)
+
     let circuit: LinearCircuit<Fr> = LinearCircuit {
         input_mle,
         weights_mle,
+        biases_mle,
         sample_size: 16,
         in_features: 8,
         out_features: 4,
