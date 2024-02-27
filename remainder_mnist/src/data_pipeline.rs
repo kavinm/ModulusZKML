@@ -6,6 +6,11 @@ pub struct NNLinearDimension {
     pub out_features: usize,
 }
 
+pub struct NNLinearInputDimension {
+    pub sample_size: usize,
+    pub num_features: usize,
+}
+
 pub struct NNLinearWeights<F: FieldExt> {
     pub weights_mle: DenseMle<F, F>,    // represent matrix on the right, note this is the A^T matrix from: https://pytorch.org/docs/stable/generated/torch.nn.Linear.html
                                         // ^ its shape is (in_features, out_features)
@@ -22,6 +27,6 @@ type ReluWitness<F> = Vec<DenseMle<F, BinDecomp16Bit<F>>>;
 
 pub struct MNISTInputData<F: FieldExt> {
     pub input_mle: DenseMle<F, F>,      // represent the input matrix has shape (sample_size, features)
-    pub sample_size: usize,
+    pub dim: NNLinearInputDimension,
     pub relu_bin_decomp: ReluWitness<F>,
 }

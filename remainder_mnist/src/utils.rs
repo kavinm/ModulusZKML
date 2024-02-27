@@ -1,11 +1,11 @@
-use ark_std::test_rng;
+use ark_std::{log2, test_rng};
 use itertools::Itertools;
 use rand::Rng;
 use rayon::str;
-use remainder::{layer::LayerId, mle::{dense::DenseMle, structs::BinDecomp16Bit}};
+use remainder::{layer::{matmult::{product_two_matrices, Matrix}, LayerId}, mle::{dense::DenseMle, structs::BinDecomp16Bit}};
 use remainder_shared_types::{FieldExt, Fr};
 
-use crate::data_pipeline::{MNISTWeights, NNLinearDimension, NNLinearWeights};
+use crate::data_pipeline::{MNISTInputData, MNISTWeights, NNLinearDimension, NNLinearInputDimension, NNLinearWeights};
 
 
 pub fn recompute_16_bit_decomp<F: FieldExt>(
@@ -165,14 +165,72 @@ pub fn load_dummy_mnist_model_weights(
     
 }
 
-pub fn load_dummy_mnist_input_data() -> () {
+pub fn load_dummy_mnist_input_data(
+    l1_weights: NNLinearWeights<Fr>,
+    input_dim: NNLinearInputDimension,
+) -> MNISTInputData<Fr> {
+
+    let mut rng = test_rng();
+
+    let input_mle: DenseMle<Fr, Fr> = DenseMle::new_from_iter(
+        (0.. (input_dim.sample_size * input_dim.num_features)).map(|_| Fr::from(rng.gen::<u64>()).into()),
+        LayerId::Input(0),
+        None,
+    );
+
+    let input_matrix = Matrix::new(
+        input_mle.mle_ref(),
+        log2(input_dim.sample_size) as usize,
+        log2(input_dim.num_features) as usize,
+        input_mle.prefix_bits,
+    );
+
+    let weights_matrix = Matrix::new(
+        l1_weights.weights_mle.mle_ref(),
+        log2(l1_weights.dim.in_features) as usize,
+        log2(l1_weights.dim.out_features) as usize,
+        l1_weights.weights_mle.prefix_bits,
+    );
+
+    let l1_out = product_two_matrices(input_matrix, weights_matrix);
+    let l1_out_w_bias = l1_out.iter().zip(
+        l1_weights.biases_mle.mle.iter()
+    ).map(|(x, bias)| {
+        let out = x + bias;
+        if out > Fr::zero() {out} else {Fr::zero()}
+    }).collect_vec();
+
+    MNISTInputData {
+        input_mle,
+        dim: input_dim,
+        relu_bin_decomp: vec![DenseMle::new_from_iter(
+            l1_out_w_bias.into_iter().map(|x| BinDecomp16Bit::from(x)),
+            LayerId::Input(0),
+            None,
+        )],
+    }
+
+}
+
+pub fn load_dummy_mnist_input_and_weights(
+    l1_dim: NNLinearDimension,
+    l2_dim: NNLinearDimension,
+    input_dim: NNLinearInputDimension,
+) -> (
+    MNISTWeights<Fr>,
+    MNISTInputData<Fr>,
+) {
+
     todo!()
 }
 
+
+/// Loads the actual MNIST model weights from the given file path.
 pub fn load_mnist_model_weights() -> () {
     todo!()
 }
 
+/// Loads the actual MNIST model inputs from the given file path.
 pub fn load_mnist_input_data() -> () {
     todo!()
 }
