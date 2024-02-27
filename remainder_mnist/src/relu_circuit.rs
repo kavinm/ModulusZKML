@@ -1,6 +1,6 @@
 use ark_std::log2;
 use itertools::{repeat_n, Itertools};
-use remainder::{expression::ExpressionStandard, layer::{batched::{combine_zero_mle_ref, BatchedLayer}, from_mle, LayerId}, mle::{dense::DenseMle, structs::BinDecomp16Bit, zero::ZeroMleRef, Mle, MleIndex, MleRef}, prover::{input_layer::{combine_input_layers::InputLayerBuilder, ligero_input_layer::LigeroInputLayer, public_input_layer::PublicInputLayer, InputLayer}, GKRCircuit, Layers, Witness}};
+use remainder::{expression::ExpressionStandard, layer::{batched::{combine_mles, combine_zero_mle_ref, BatchedLayer}, from_mle, LayerId}, mle::{dense::DenseMle, structs::BinDecomp16Bit, zero::ZeroMleRef, Mle, MleIndex, MleRef}, prover::{input_layer::{combine_input_layers::InputLayerBuilder, ligero_input_layer::LigeroInputLayer, public_input_layer::PublicInputLayer, InputLayer}, GKRCircuit, Layers, Witness}};
 use remainder_shared_types::{transcript::{poseidon_transcript::PoseidonTranscript, Transcript}, FieldExt, Fr};
 
 use crate::{circuit_builders::{BinaryRecompCheckerBuilder, PositiveBinaryRecompBuilder}, utils::generate_16_bit_decomp_signed};
@@ -111,11 +111,54 @@ impl<F: FieldExt> GKRCircuit<F> for ReluCircuit<F> {
 
         // **************************** END: checking the bits are binary ****************************
 
+        // **************************** BEGIN: the actual relu circuit ****************************
+
+        // --- Create the builders for (1 - b_i) * x_i ---
+        // ---   this simplifies to x_i - b_i * x_i    ---
+        let relu_builders = self.signed_bin_decomp_mles
+            .iter_mut().zip(self.mles.clone().into_iter())
+            .map(|(signed_bin_decomp_mle, mle)| {
+            
+            from_mle(
+                (
+                    signed_bin_decomp_mle,
+                    mle
+                ), 
+                |(signed_bin_decomp_mle, mle)| {
+                    let signed_bit_mle_ref = signed_bin_decomp_mle.mle_bit_refs()[signed_bin_decomp_mle.mle_bit_refs().len() - 1].clone();
+                    ExpressionStandard::Mle(mle.mle_ref()) - ExpressionStandard::Product(vec![signed_bit_mle_ref, mle.mle_ref()])
+                }, 
+                |(
+                    signed_bin_decomp_mle,
+                    mle
+                ), id, prefix_bits| {
+
+                    let result_iter = signed_bin_decomp_mle
+                        .mle_bit_refs()[signed_bin_decomp_mle.mle_bit_refs().len() - 1].clone()
+                        .bookkeeping_table.into_iter()
+                        .zip(mle.into_iter())
+                        .map(|(signed_bit, mle)| {
+                            (F::from(1) - signed_bit) * mle
+                        });
+                    DenseMle::new_from_iter(result_iter, id, prefix_bits)
+            })
+        }).collect_vec();
+
+        let relu_results = combine_mles(
+            layers.add_gkr(BatchedLayer::new(relu_builders)).into_iter().map(|relu_mle| {
+                relu_mle.mle_ref()
+            }).collect_vec(),
+            num_dataparallel_bits
+        );
+
+        // **************************** END: the actual relu circuit ****************************
+
         Witness {
             layers,
             output_layers: vec![
                 recomp_checker_results.get_enum(),
                 bits_are_binary_results.get_enum(),
+                relu_results.get_enum(),
             ],
             input_layers: vec![live_committed_input_layer.to_enum()]
         }
