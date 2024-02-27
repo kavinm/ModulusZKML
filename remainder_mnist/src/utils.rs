@@ -136,7 +136,7 @@ pub fn gen_random_nn_linear_weights<F: FieldExt>(
     );
 
     let biases_mle: DenseMle<F, F> = DenseMle::new_from_iter(
-        (0..1 << dim.out_features).map(|_| F::from(rng.gen_range(0..=15)).into()),
+        (0..dim.out_features).map(|_| F::from(rng.gen_range(0..=15)).into()),
         LayerId::Input(0),
         None,
     );
