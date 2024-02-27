@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [[bin]]
-name = "run_matmut_circuit"
-path = "src/bin/run_matmut_circuit.rs"
+name = "run_mnist_circuit"
+path = "src/bin/run_mnist_circuit.rs"
 
 
 [dependencies]
