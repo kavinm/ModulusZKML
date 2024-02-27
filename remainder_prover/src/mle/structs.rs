@@ -20,6 +20,14 @@ pub struct BinDecomp16Bit<F> {
     pub bits: [F; 16],
 }
 
+impl<F: FieldExt> From<Vec<bool>> for BinDecomp16Bit<F> {
+    fn from(bits: Vec<bool>) -> Self {
+        BinDecomp16Bit::<F> {
+            bits: bits.iter().map(|x| F::from(*x as u64)).collect::<Vec<F>>().try_into().unwrap()
+        }
+    }
+}
+
 // --- Bin decomp ---
 impl<F: FieldExt> MleAble<F> for BinDecomp16Bit<F> {
     type Repr = [Vec<F>; 16];

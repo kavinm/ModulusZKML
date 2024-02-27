@@ -7,7 +7,6 @@ pub struct NNLinearDimension {
 }
 
 pub struct NNLinearInputDimension {
-    pub sample_size: usize,
     pub num_features: usize,
 }
 
@@ -23,7 +22,8 @@ pub struct MNISTWeights<F: FieldExt> {
     pub l2_linear_weights: NNLinearWeights<F>,
 }
 
-type ReluWitness<F> = Vec<DenseMle<F, BinDecomp16Bit<F>>>;
+/// Not batched
+type ReluWitness<F> = DenseMle<F, BinDecomp16Bit<F>>;
 
 pub struct MNISTInputData<F: FieldExt> {
     pub input_mle: DenseMle<F, F>,      // represent the input matrix has shape (sample_size, features)

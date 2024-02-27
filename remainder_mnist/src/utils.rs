@@ -3,7 +3,7 @@ use itertools::Itertools;
 use rand::Rng;
 use rayon::str;
 use remainder::{layer::{matmult::{product_two_matrices, Matrix}, LayerId}, mle::{dense::DenseMle, structs::BinDecomp16Bit}};
-use remainder_shared_types::{FieldExt, Fr};
+use remainder_shared_types::{halo2curves::FieldExt as Halo2FieldExt, FieldExt, Fr};
 
 use crate::data_pipeline::{MNISTInputData, MNISTWeights, NNLinearDimension, NNLinearInputDimension, NNLinearWeights};
 
@@ -18,50 +18,50 @@ pub fn recompute_16_bit_decomp<F: FieldExt>(
     })
 }
 
-pub fn generate_16_bit_decomp<F: FieldExt>(
-    sample_size: usize,
-    in_features: usize,
-) -> (
-    Vec<DenseMle<F, BinDecomp16Bit<F>>>,
-    Vec<DenseMle<F, F>>,
-) {
-    let mut rng = test_rng();
+// pub fn generate_16_bit_decomp<F: FieldExt>(
+//     sample_size: usize,
+//     in_features: usize,
+// ) -> (
+//     Vec<DenseMle<F, BinDecomp16Bit<F>>>,
+//     Vec<DenseMle<F, F>>,
+// ) {
+//     let mut rng = test_rng();
 
-    let bin_decomp_16_bits: Vec<Vec<[F; 16]>> = (0..sample_size).map(
-        |_| (0..in_features).map(
-            |_| (0..16).map(
-                |_| F::from(rng.gen_range(0..=1))
-            ).collect_vec().try_into().unwrap()
-        ).collect()
-    ).collect();
+//     let bin_decomp_16_bits: Vec<Vec<[F; 16]>> = (0..sample_size).map(
+//         |_| (0..in_features).map(
+//             |_| (0..16).map(
+//                 |_| F::from(rng.gen_range(0..=1))
+//             ).collect_vec().try_into().unwrap()
+//         ).collect()
+//     ).collect();
 
-    let mle_bin_decomp_16_bits = bin_decomp_16_bits.clone().into_iter().map(
-        |sample| DenseMle::new_from_iter(
-                sample.into_iter().map(
-                    |in_feature| BinDecomp16Bit {
-                        bits: in_feature,
-                    }
-                ), LayerId::Input(0), None
-        )
-    ).collect_vec();
+//     let mle_bin_decomp_16_bits = bin_decomp_16_bits.clone().into_iter().map(
+//         |sample| DenseMle::new_from_iter(
+//                 sample.into_iter().map(
+//                     |in_feature| BinDecomp16Bit {
+//                         bits: in_feature,
+//                     }
+//                 ), LayerId::Input(0), None
+//         )
+//     ).collect_vec();
 
-    let bin_decomp_recomp: Vec<Vec<F>> = bin_decomp_16_bits.iter().map(
-        |sample| sample.iter().map(
-            |in_feature| recompute_16_bit_decomp(in_feature)
-        ).collect()
-    ).collect();
+//     let bin_decomp_recomp: Vec<Vec<F>> = bin_decomp_16_bits.iter().map(
+//         |sample| sample.iter().map(
+//             |in_feature| recompute_16_bit_decomp(in_feature)
+//         ).collect()
+//     ).collect();
 
-    let mle_bin_decomp_recomp = bin_decomp_recomp.into_iter().map(
-        |sample| DenseMle::new_from_iter(
-                sample.into_iter(),
-                LayerId::Input(0),
-                None,
-        )
-    ).collect();
+//     let mle_bin_decomp_recomp = bin_decomp_recomp.into_iter().map(
+//         |sample| DenseMle::new_from_iter(
+//                 sample.into_iter(),
+//                 LayerId::Input(0),
+//                 None,
+//         )
+//     ).collect();
 
-    (mle_bin_decomp_16_bits, mle_bin_decomp_recomp)
+//     (mle_bin_decomp_16_bits, mle_bin_decomp_recomp)
 
-}
+// }
 
 
 pub fn recompute_16_bit_decomp_signed<F: FieldExt>(
@@ -85,45 +85,40 @@ pub fn recompute_16_bit_decomp_signed<F: FieldExt>(
 }
 
 pub fn generate_16_bit_decomp_signed<F: FieldExt>(
-    sample_size: usize,
     in_features: usize,
 ) -> (
-    Vec<DenseMle<F, BinDecomp16Bit<F>>>,
-    Vec<DenseMle<F, F>>,
+    DenseMle<F, BinDecomp16Bit<F>>,
+    DenseMle<F, F>,
 ) {
     let mut rng = test_rng();
 
-    let bin_decomp_16_bits: Vec<Vec<[F; 16]>> = (0..sample_size).map(
-        |_| (0..in_features).map(
+    let bin_decomp_16_bits: Vec<[F; 16]> = 
+        (0..in_features).map(
             |_| (0..16).map(
                 |_| F::from(rng.gen_range(0..=1))
             ).collect_vec().try_into().unwrap()
-        ).collect()
-    ).collect();
+        ).collect();
 
-    let mle_bin_decomp_16_bits = bin_decomp_16_bits.clone().into_iter().map(
-        |sample| DenseMle::new_from_iter(
-                sample.into_iter().map(
-                    |in_feature| BinDecomp16Bit {
-                        bits: in_feature,
-                    }
-                ), LayerId::Input(0), None
-        )
-    ).collect_vec();
+    let mle_bin_decomp_16_bits = 
+        DenseMle::new_from_iter(
+            bin_decomp_16_bits.into_iter().map(
+                |in_feature| BinDecomp16Bit {
+                    bits: in_feature,
+                }
+            ), LayerId::Input(0), None
+    );
 
-    let bin_decomp_recomp: Vec<Vec<F>> = bin_decomp_16_bits.iter().map(
-        |sample| sample.iter().map(
+    let bin_decomp_recomp: Vec<F> = 
+        bin_decomp_16_bits.iter().map(
             |in_feature| recompute_16_bit_decomp_signed(in_feature)
-        ).collect()
-    ).collect();
+        ).collect();
 
-    let mle_bin_decomp_recomp = bin_decomp_recomp.into_iter().map(
-        |sample| DenseMle::new_from_iter(
-                sample.into_iter(),
+    let mle_bin_decomp_recomp = 
+        DenseMle::new_from_iter(
+                bin_decomp_recomp.into_iter(),
                 LayerId::Input(0),
                 None,
-        )
-    ).collect();
+        );
 
     (mle_bin_decomp_16_bits, mle_bin_decomp_recomp)
 
@@ -135,13 +130,13 @@ pub fn gen_random_nn_linear_weights<F: FieldExt>(
     let mut rng = test_rng();
 
     let weights_mle: DenseMle<F, F> = DenseMle::new_from_iter(
-        (0.. (dim.in_features * dim.out_features)).map(|_| F::from(rng.gen::<u64>()).into()),
+        (0.. (dim.in_features * dim.out_features)).map(|_| F::from(rng.gen_range(0..=15)).into()),
         LayerId::Input(0),
         None,
     );
 
     let biases_mle: DenseMle<F, F> = DenseMle::new_from_iter(
-        (0..1 << dim.out_features).map(|_| F::from(rng.gen::<u64>()).into()),
+        (0..1 << dim.out_features).map(|_| F::from(rng.gen_range(0..=15)).into()),
         LayerId::Input(0),
         None,
     );
@@ -165,6 +160,34 @@ pub fn load_dummy_mnist_model_weights(
     
 }
 
+/// Return the `bit_length` bit signed decomposition of the specified i32, or None if the argument is too large.
+/// Result is little endian (so LSB has index 0).
+/// Sign bit has maximal index.
+/// Pre: bit_length > 1.
+pub fn build_signed_bit_decomposition(value: i32, bit_length: usize) -> Option<Vec<bool>> {
+    let unsigned = build_unsigned_bit_decomposition(value.unsigned_abs(), bit_length - 1);
+    if let Some(mut bits) = unsigned {
+        bits.push(value < 0);
+        return Some(bits);
+    }
+    None
+}
+
+/// Return the `bit_length` bit decomposition of the specified u32, or None if the argument is too large.
+/// Result is little endian i.e. LSB has index 0.
+pub fn build_unsigned_bit_decomposition(mut value: u32, bit_length: usize) -> Option<Vec<bool>> {
+    let mut bits = vec![];
+    for _ in 0..bit_length {
+        bits.push((value & 1) != 0);
+        value >>= 1;
+    }
+    if value == 0 {
+        Some(bits)
+    } else {
+        None
+    }
+}
+
 pub fn load_dummy_mnist_input_data(
     l1_weights: NNLinearWeights<Fr>,
     input_dim: NNLinearInputDimension,
@@ -172,15 +195,17 @@ pub fn load_dummy_mnist_input_data(
 
     let mut rng = test_rng();
 
+    let input_data: Vec<u64> = (0..(input_dim.num_features)).map(|_| rng.gen_range(0..=15)).collect_vec();
+
     let input_mle: DenseMle<Fr, Fr> = DenseMle::new_from_iter(
-        (0.. (input_dim.sample_size * input_dim.num_features)).map(|_| Fr::from(rng.gen::<u64>()).into()),
+        input_data.into_iter().map(|x| Fr::from(x)),
         LayerId::Input(0),
         None,
     );
 
     let input_matrix = Matrix::new(
         input_mle.mle_ref(),
-        log2(input_dim.sample_size) as usize,
+        0 as usize,
         log2(input_dim.num_features) as usize,
         input_mle.prefix_bits,
     );
@@ -196,18 +221,28 @@ pub fn load_dummy_mnist_input_data(
     let l1_out_w_bias = l1_out.iter().zip(
         l1_weights.biases_mle.mle.iter()
     ).map(|(x, bias)| {
-        let out = x + bias;
-        if out > Fr::zero() {out} else {Fr::zero()}
+        x + bias
     }).collect_vec();
+
+    // --- Need to compute binary decomp of the result of the first matmul ---
+    let relu_decomp = l1_out_w_bias.into_iter().map(|x| {
+        let field_elem_u32_repr = x.get_lower_128() as u32;
+        let decomp = build_unsigned_bit_decomposition(field_elem_u32_repr, 16).unwrap();
+        BinDecomp16Bit::<Fr>::from(decomp)
+    }).collect_vec();
+
+    let l1_out_w_bias_w_relu = l1_out_w_bias.into_iter().map(|x| {
+        if x > Fr::zero() {x} else {Fr::zero()}
+    });
 
     MNISTInputData {
         input_mle,
         dim: input_dim,
-        relu_bin_decomp: vec![DenseMle::new_from_iter(
-            l1_out_w_bias.into_iter().map(|x| BinDecomp16Bit::from(x)),
+        relu_bin_decomp: DenseMle::new_from_iter(
+            relu_decomp.into_iter(),
             LayerId::Input(0),
             None,
-        )],
+        ),
     }
 
 }
