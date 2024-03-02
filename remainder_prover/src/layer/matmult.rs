@@ -531,6 +531,10 @@ pub fn gen_transpose_matrix<F: FieldExt>(
     prefix_bits: Option<Vec<MleIndex<F>>>,
 ) -> DenseMleRef<F> {
 
+    println!("matrix.bookkeeping_table {:?}", matrix.bookkeeping_table.len());
+    println!("num_rows {:?}", num_rows);
+    println!("num_cols {:?}", num_cols);
+
     let matrix_array_2 = Array2::from_shape_vec((num_rows, num_cols), matrix.bookkeeping_table.clone()).unwrap();
     let matrix_transpose = matrix_array_2.reversed_axes();
     let matrix_transp_vec = matrix_transpose.outer_iter()
@@ -565,11 +569,118 @@ pub fn product_two_matrices<F: FieldExt>(
 #[cfg(test)]
 mod test {
     use remainder_shared_types::{Fr, transcript::poseidon_transcript::PoseidonTranscript};
-    use ark_std::test_rng;
+    use ark_std::{log2, test_rng};
 
     use crate::{layer::{claims::Claim, LayerId, matmult::{Matrix, gen_transpose_matrix, product_two_matrices}}, mle::dense::{DenseMle, DenseMleRef}};
 
     use super::MatMult;
+
+    #[test]
+    fn test_product_irregular_matrices() {
+        let mle_vec_a = vec![
+                                        Fr::from(1),
+                                        Fr::from(2),
+                                        Fr::from(9),
+                                        Fr::from(10),
+                                        Fr::from(13),
+                                        Fr::from(1),
+                                        Fr::from(3),
+                                        Fr::from(10),
+                                        Fr::from(2),
+                                        Fr::from(9),
+                                        Fr::from(10),
+                                        Fr::from(1),
+                                        Fr::from(3),
+                                        Fr::from(10),
+                                        Fr::from(2),
+                                    ];
+        let mle_vec_b = vec![
+                                        Fr::from(3),
+                                        Fr::from(5),
+                                        Fr::from(9),
+                                        Fr::from(6),
+                                        Fr::from(5),
+                                        Fr::from(9),
+                                        Fr::from(6),
+                                        Fr::from(1),
+                                        Fr::from(3),
+                                    ];
+
+        let mle_a: DenseMle<Fr, Fr> = DenseMle::new_from_raw(mle_vec_a, LayerId::Input(0), None);
+        let mle_b: DenseMle<Fr, Fr> = DenseMle::new_from_raw(mle_vec_b, LayerId::Input(0), None);
+
+        let matrix_a = Matrix::new(mle_a.mle_ref(), log2(5) as usize, log2(3) as usize, None);
+        let matrix_b = Matrix::new(mle_b.mle_ref(), log2(3) as usize, log2(3) as usize, None);
+
+        let res_product = product_two_matrices(matrix_a, matrix_b);
+
+        println!("res_product {:?}", res_product);
+
+        // let exp_product = vec![Fr::from(1*3 + 2*9), Fr::from(1*5 + 2*6), Fr::from(9*3 + 10*9), Fr::from(9*5 + 10*6), 
+        //                                 Fr::from(13*3 + 1*9), Fr::from(13*5 + 1*6), Fr::from(3*3 + 10*9), Fr::from(3*5 + 10*6)];
+
+        // assert_eq!(res_product, exp_product);
+    }
+
+    #[test]
+    fn test_sumcheck_irregular_matrices() {
+
+        let mut rng = test_rng();
+
+        let claim = Claim::new_raw(vec![Fr::from(1), Fr::from(0)], Fr::from(3));
+
+
+        let mle_vec_a = vec![
+                                        Fr::from(1),
+                                        Fr::from(2),
+                                        Fr::from(9),
+                                        Fr::from(10),
+                                        Fr::from(13),
+                                        Fr::from(1),
+                                        Fr::from(3),
+                                        Fr::from(10),
+                                        Fr::from(2),
+                                        Fr::from(9),
+                                        Fr::from(10),
+                                        Fr::from(1),
+                                        Fr::from(3),
+                                        Fr::from(10),
+                                        Fr::from(2),
+                                    ];
+        let mle_vec_b = vec![
+                                        Fr::from(3),
+                                        Fr::from(5),
+                                        Fr::from(9),
+                                        Fr::from(6),
+                                        Fr::from(5),
+                                        Fr::from(9),
+                                        Fr::from(6),
+                                        Fr::from(1),
+                                        Fr::from(3),
+                                    ];
+
+        let mle_a: DenseMle<Fr, Fr> = DenseMle::new_from_raw(mle_vec_a, LayerId::Input(0), None);
+        let mle_b: DenseMle<Fr, Fr> = DenseMle::new_from_raw(mle_vec_b, LayerId::Input(0), None);
+
+        let matrix_a = Matrix::new(mle_a.mle_ref(), log2(5) as usize, log2(3) as usize, None);
+        let matrix_b = Matrix::new(mle_b.mle_ref(), log2(3) as usize, log2(3) as usize, None);
+
+        let mut matrix_init: MatMult<Fr, PoseidonTranscript<Fr>> = MatMult::new(
+            LayerId::Input(0),
+            matrix_a,
+            matrix_b,
+        );
+
+        let messages = matrix_init.dummy_prove_rounds(claim.clone(), &mut rng);
+        let verify_res = matrix_init.dummy_verify_rounds(messages.unwrap(), &mut rng, claim);
+
+        assert!(verify_res.is_ok());
+
+        // let exp_product = vec![Fr::from(1*3 + 2*9), Fr::from(1*5 + 2*6), Fr::from(9*3 + 10*9), Fr::from(9*5 + 10*6), 
+        //                                 Fr::from(13*3 + 1*9), Fr::from(13*5 + 1*6), Fr::from(3*3 + 10*9), Fr::from(3*5 + 10*6)];
+
+        // assert_eq!(res_product, exp_product);
+    }
 
     #[test]
     fn test_product_two_matrices() {

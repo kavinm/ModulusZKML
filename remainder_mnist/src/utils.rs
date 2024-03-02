@@ -217,6 +217,13 @@ pub fn load_dummy_mnist_input_data(
         l1_weights.weights_mle.prefix_bits.clone(),
     );
 
+    println!("INPUT MATRIX {:?}", input_matrix.num_rows_vars);
+    println!("INPUT MATRIX {:?}", input_matrix.num_cols_vars);
+    println!("INPUT MATRIX {:?}", input_mle.mle_ref().bookkeeping_table.len());
+    println!("weights_matrix MATRIX {:?}", weights_matrix.num_rows_vars);
+    println!("weights_matrix MATRIX {:?}", weights_matrix.num_cols_vars);
+    println!("weights_matrix MATRIX {:?}", l1_weights.weights_mle.mle_ref().bookkeeping_table.len());
+
     let l1_out = product_two_matrices(input_matrix, weights_matrix);
     let l1_out_w_bias = l1_out.iter().zip(
         l1_weights.biases_mle.mle.iter()
