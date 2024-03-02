@@ -25,15 +25,40 @@ pub struct Matrix<F: FieldExt> {
 
 impl<F: FieldExt> Matrix<F> {
     pub fn new(
-        mle_ref: DenseMleRef<F>, 
-        num_rows_vars: usize,
-        num_cols_vars: usize,
+        mut mle_ref: DenseMleRef<F>, 
+        num_rows: usize,
+        num_cols: usize,
         prefix_bits: Option<Vec<MleIndex<F>>>,
     ) -> Matrix<F> {
+
+        assert_eq!(mle_ref.bookkeeping_table().len(), num_rows * num_cols);
+
+        // pad the columns
+        if 1 << log2(num_cols) != num_cols {
+            let mut new_bookkeeping_table = Vec::new();
+            let num_to_pad_each_row = (1 << log2(num_cols) as usize) - num_cols;
+            for chunk in mle_ref.bookkeeping_table.chunks(num_cols) {
+                new_bookkeeping_table.extend(
+                    [chunk.to_vec(), vec![F::zero(); num_to_pad_each_row]].into_iter().concat()
+                )
+            }
+            mle_ref.bookkeeping_table = new_bookkeeping_table;
+        }
+
+
+        // pad the rows
+        let padded_matrix_len = (1 << log2(num_rows) as usize) * (1 << log2(num_cols) as usize);
+        if mle_ref.bookkeeping_table.len() != padded_matrix_len {
+            let num_need_to_pad = padded_matrix_len - mle_ref.bookkeeping_table.len();
+            mle_ref.bookkeeping_table = [mle_ref.bookkeeping_table, vec![F::zero(); num_need_to_pad]].into_iter().concat() 
+        }
+
+        assert_eq!(padded_matrix_len, mle_ref.bookkeeping_table.len());
+
         Matrix {
             mle_ref,
-            num_rows_vars,
-            num_cols_vars,
+            num_rows_vars: log2(num_rows) as usize,
+            num_cols_vars: log2(num_cols) as usize,
             prefix_bits,
         }
     }
@@ -75,15 +100,9 @@ impl<F: FieldExt, Tr: Transcript<F>> MatMult<F, Tr> {
         let matrix_a_mle_ref = &mut self.matrix_a.mle_ref;
         let mut matrix_b_mle_ref = &mut self.matrix_b.mle_ref;
 
-        // appropriately padding both of the matrices
-        let num_rows_a = 1 << &self.matrix_a.num_rows_vars;
-        let num_cols_a = 1 << &self.matrix_a.num_cols_vars;
-        let num_rows_b = 1 << &self.matrix_b.num_rows_vars;
-        let num_cols_b = 1 << &self.matrix_b.num_cols_vars;
-        let amount_to_be_padded_a = (num_rows_a * num_cols_a) - matrix_a_mle_ref.bookkeeping_table.len();
-        let amount_to_be_padded_b = (num_rows_b * num_cols_b) - matrix_b_mle_ref.bookkeeping_table.len();
-        matrix_a_mle_ref.bookkeeping_table = [matrix_a_mle_ref.bookkeeping_table.clone(), vec![F::zero(); amount_to_be_padded_a]].into_iter().concat();
-        matrix_b_mle_ref.bookkeeping_table = [matrix_b_mle_ref.bookkeeping_table.clone(), vec![F::zero(); amount_to_be_padded_b]].into_iter().concat();
+        // check that both matrices are padded
+        assert_eq!((1 << self.matrix_a.num_cols_vars) * (1 << self.matrix_a.num_rows_vars), matrix_a_mle_ref.bookkeeping_table().len());
+        assert_eq!((1 << self.matrix_b.num_cols_vars) * (1 << self.matrix_b.num_rows_vars), matrix_b_mle_ref.bookkeeping_table().len());
 
         // check to make sure the dimensions match
         if self.matrix_a.num_cols_vars == self.matrix_b.num_rows_vars {
@@ -94,7 +113,7 @@ impl<F: FieldExt, Tr: Transcript<F>> MatMult<F, Tr> {
         }
 
         let transpose_timer = start_timer!(|| "transpose matrix");
-        let mut matrix_a_transp = gen_transpose_matrix(&matrix_a_mle_ref, num_rows_a, num_cols_a, self.matrix_a.prefix_bits.clone());
+        let mut matrix_a_transp = gen_transpose_matrix(&matrix_a_mle_ref, self.matrix_a.num_rows_vars, self.matrix_a.num_cols_vars, self.matrix_a.prefix_bits.clone());
         end_timer!(transpose_timer);
 
         matrix_a_transp.index_mle_indices(0);
@@ -526,10 +545,13 @@ impl<F: std::fmt::Debug + FieldExt, Tr: Transcript<F>> MatMult<F, Tr> {
 
 pub fn gen_transpose_matrix<F: FieldExt>(
     matrix: &DenseMleRef<F>,
-    num_rows: usize,
-    num_cols: usize,
+    num_rows_vars: usize,
+    num_cols_vars: usize,
     prefix_bits: Option<Vec<MleIndex<F>>>,
 ) -> DenseMleRef<F> {
+
+    let num_rows = 1 << num_rows_vars;
+    let num_cols = 1 << num_cols_vars;
 
     println!("matrix.bookkeeping_table {:?}", matrix.bookkeeping_table.len());
     println!("num_rows {:?}", num_rows);
@@ -551,7 +573,7 @@ pub fn product_two_matrices<F: FieldExt>(
 ) -> Vec<F> {
     let num_middle_ab = 1 << matrix_a.num_cols_vars;
 
-        let matrix_b_transpose = gen_transpose_matrix(&matrix_b.mle_ref, 1 << matrix_b.num_rows_vars, 1 << matrix_b.num_cols_vars, matrix_a.prefix_bits);
+        let matrix_b_transpose = gen_transpose_matrix(&matrix_b.mle_ref, matrix_b.num_rows_vars, matrix_b.num_cols_vars, matrix_a.prefix_bits);
         let product_matrix = matrix_a.mle_ref.bookkeeping_table.chunks(num_middle_ab as usize).flat_map(
             |chunk_a| {
                 matrix_b_transpose.bookkeeping_table.chunks(num_middle_ab).map(
@@ -571,7 +593,7 @@ mod test {
     use remainder_shared_types::{Fr, transcript::poseidon_transcript::PoseidonTranscript};
     use ark_std::{log2, test_rng};
 
-    use crate::{layer::{claims::Claim, LayerId, matmult::{Matrix, gen_transpose_matrix, product_two_matrices}}, mle::dense::{DenseMle, DenseMleRef}};
+    use crate::{layer::{claims::Claim, matmult::{gen_transpose_matrix, product_two_matrices, Matrix}, LayerId}, mle::{dense::{DenseMle, DenseMleRef}, MleRef}};
 
     use super::MatMult;
 
@@ -609,26 +631,33 @@ mod test {
         let mle_a: DenseMle<Fr, Fr> = DenseMle::new_from_raw(mle_vec_a, LayerId::Input(0), None);
         let mle_b: DenseMle<Fr, Fr> = DenseMle::new_from_raw(mle_vec_b, LayerId::Input(0), None);
 
-        let matrix_a = Matrix::new(mle_a.mle_ref(), log2(5) as usize, log2(3) as usize, None);
-        let matrix_b = Matrix::new(mle_b.mle_ref(), log2(3) as usize, log2(3) as usize, None);
+        let matrix_a = Matrix::new(mle_a.mle_ref(), 5, 3, None);
+        let matrix_b = Matrix::new(mle_b.mle_ref(), 3, 3, None);
 
         let res_product = product_two_matrices(matrix_a, matrix_b);
 
-        println!("res_product {:?}", res_product);
+        // 1  2  9
+        // 10 13 1       3  5  9
+        // 3  10 2   `   6  5  9
+        // 9  10 1       6  1  3
+        // 3  10 2
 
-        // let exp_product = vec![Fr::from(1*3 + 2*9), Fr::from(1*5 + 2*6), Fr::from(9*3 + 10*9), Fr::from(9*5 + 10*6), 
-        //                                 Fr::from(13*3 + 1*9), Fr::from(13*5 + 1*6), Fr::from(3*3 + 10*9), Fr::from(3*5 + 10*6)];
+        let exp_product = vec![Fr::from(1*3 + 2*6 + 9*6), Fr::from(1*5 + 2*5 + 9*1), Fr::from(1*9 + 2*9 + 9*3),
+                                        Fr::from(10*3 + 13*6 + 1*6), Fr::from(10*5 + 13*5 + 1*1), Fr::from(10*9 + 13*9 + 1*3),
+                                        Fr::from(3*3 + 10*6 + 2*6), Fr::from(3*5 + 10*5 + 2*1), Fr::from(3*9 + 10*9 + 2*3),
+                                        Fr::from(9*3 + 10*6 + 1*6), Fr::from(9*5 + 10*5 + 1*1), Fr::from(9*9 + 10*9 + 1*3),
+                                        Fr::from(3*3 + 10*6 + 2*6), Fr::from(3*5 + 10*5 + 2*1), Fr::from(3*9 + 10*9 + 2*3),];
 
-        // assert_eq!(res_product, exp_product);
+        let mle_out: DenseMle<Fr, Fr> = DenseMle::new_from_raw(exp_product, LayerId::Input(0), None);
+        let matrix_out = Matrix::new(mle_out.mle_ref(), 5, 3, None);
+
+        assert_eq!(res_product, matrix_out.mle_ref.bookkeeping_table());
     }
 
     #[test]
     fn test_sumcheck_irregular_matrices() {
 
         let mut rng = test_rng();
-
-        let claim = Claim::new_raw(vec![Fr::from(1), Fr::from(0)], Fr::from(3));
-
 
         let mle_vec_a = vec![
                                         Fr::from(1),
@@ -662,8 +691,29 @@ mod test {
         let mle_a: DenseMle<Fr, Fr> = DenseMle::new_from_raw(mle_vec_a, LayerId::Input(0), None);
         let mle_b: DenseMle<Fr, Fr> = DenseMle::new_from_raw(mle_vec_b, LayerId::Input(0), None);
 
-        let matrix_a = Matrix::new(mle_a.mle_ref(), log2(5) as usize, log2(3) as usize, None);
-        let matrix_b = Matrix::new(mle_b.mle_ref(), log2(3) as usize, log2(3) as usize, None);
+        let matrix_a = Matrix::new(mle_a.mle_ref(), 5, 3, None);
+        let matrix_b = Matrix::new(mle_b.mle_ref(), 3, 3, None);
+
+        let res_product = product_two_matrices(matrix_a.clone(), matrix_b.clone());
+        let mut mle_product_ref: DenseMleRef<Fr> = DenseMle::new_from_raw(res_product, LayerId::Input(0), None).mle_ref();
+
+        let _ = mle_product_ref.index_mle_indices(0);
+
+        mle_product_ref.fix_variable(0, Fr::from(1));
+        mle_product_ref.fix_variable(1, Fr::from(2));
+        mle_product_ref.fix_variable(2, Fr::from(3));
+        mle_product_ref.fix_variable(3, Fr::from(4));
+        mle_product_ref.fix_variable(4, Fr::from(5));
+
+        assert_eq!(mle_product_ref.bookkeeping_table().len(), 1);
+
+        let claim = Claim::new_raw(vec![
+                                                            Fr::from(1),
+                                                            Fr::from(2),
+                                                            Fr::from(3),
+                                                            Fr::from(4),
+                                                            Fr::from(5),
+                                                        ], mle_product_ref.bookkeeping_table()[0]);
 
         let mut matrix_init: MatMult<Fr, PoseidonTranscript<Fr>> = MatMult::new(
             LayerId::Input(0),
@@ -676,10 +726,6 @@ mod test {
 
         assert!(verify_res.is_ok());
 
-        // let exp_product = vec![Fr::from(1*3 + 2*9), Fr::from(1*5 + 2*6), Fr::from(9*3 + 10*9), Fr::from(9*5 + 10*6), 
-        //                                 Fr::from(13*3 + 1*9), Fr::from(13*5 + 1*6), Fr::from(3*3 + 10*9), Fr::from(3*5 + 10*6)];
-
-        // assert_eq!(res_product, exp_product);
     }
 
     #[test]
@@ -689,8 +735,8 @@ mod test {
         let mle_a: DenseMle<Fr, Fr> = DenseMle::new_from_raw(mle_vec_a, LayerId::Input(0), None);
         let mle_b: DenseMle<Fr, Fr> = DenseMle::new_from_raw(mle_vec_b, LayerId::Input(0), None);
 
-        let matrix_a = Matrix::new(mle_a.mle_ref(), 2, 1, None);
-        let matrix_b = Matrix::new(mle_b.mle_ref(), 1, 1, None);
+        let matrix_a = Matrix::new(mle_a.mle_ref(), 4, 2, None);
+        let matrix_b = Matrix::new(mle_b.mle_ref(), 2, 2, None);
 
         let res_product = product_two_matrices(matrix_a, matrix_b);
 
@@ -721,8 +767,8 @@ mod test {
         let mle_a: DenseMle<Fr, Fr> = DenseMle::new_from_raw(mle_vec_a, LayerId::Input(0), None);
         let mle_b: DenseMle<Fr, Fr> = DenseMle::new_from_raw(mle_vec_b, LayerId::Input(0), None);
 
-        let matrix_a = Matrix::new(mle_a.mle_ref(), 3, 2, None);
-        let matrix_b = Matrix::new(mle_b.mle_ref(), 2, 1, None);
+        let matrix_a = Matrix::new(mle_a.mle_ref(), 8, 4, None);
+        let matrix_b = Matrix::new(mle_b.mle_ref(), 4, 2, None);
 
         let res_product = product_two_matrices(matrix_a, matrix_b);
 
@@ -749,7 +795,7 @@ mod test {
         let expected_vec = vec![Fr::from(1), Fr::from(9), Fr::from(13), Fr::from(3), Fr::from(2), Fr::from(10), Fr::from(1), Fr::from(10)];
         let expected_ref: DenseMleRef<Fr> = DenseMle::new_from_raw(expected_vec, LayerId::Input(0), None).mle_ref();
 
-        assert_eq!(gen_transpose_matrix(&mle_ref, 4, 2, None).bookkeeping_table, expected_ref.bookkeeping_table);
+        assert_eq!(gen_transpose_matrix(&mle_ref, 2, 1, None).bookkeeping_table, expected_ref.bookkeeping_table);
     }
 
     #[test]
@@ -763,8 +809,8 @@ mod test {
         let matrix_a_mle: DenseMle<Fr, Fr> = DenseMle::new_from_raw(matrix_a_vec, LayerId::Input(0), None);
         let matrix_b_mle: DenseMle<Fr, Fr> = DenseMle::new_from_raw(matrix_b_vec, LayerId::Input(0), None);
 
-        let matrix_a: Matrix<Fr> = Matrix::new(matrix_a_mle.mle_ref(), 1, 1, None);
-        let matrix_b: Matrix<Fr> = Matrix::new(matrix_b_mle.mle_ref(), 1, 1, None);
+        let matrix_a: Matrix<Fr> = Matrix::new(matrix_a_mle.mle_ref(), 2, 2, None);
+        let matrix_b: Matrix<Fr> = Matrix::new(matrix_b_mle.mle_ref(), 2, 2, None);
 
         let mut matrix_init: MatMult<Fr, PoseidonTranscript<Fr>> = MatMult::new(
             LayerId::Input(0),
@@ -789,8 +835,8 @@ mod test {
         let matrix_a_mle: DenseMle<Fr, Fr> = DenseMle::new_from_raw(matrix_a_vec, LayerId::Input(0), None);
         let matrix_b_mle: DenseMle<Fr, Fr> = DenseMle::new_from_raw(matrix_b_vec, LayerId::Input(0), None);
 
-        let matrix_a: Matrix<Fr> = Matrix::new(matrix_a_mle.mle_ref(), 1, 2, None);
-        let matrix_b: Matrix<Fr> = Matrix::new(matrix_b_mle.mle_ref(), 2, 0, None);
+        let matrix_a: Matrix<Fr> = Matrix::new(matrix_a_mle.mle_ref(), 2, 4, None);
+        let matrix_b: Matrix<Fr> = Matrix::new(matrix_b_mle.mle_ref(), 4, 1, None);
 
         let mut matrix_init: MatMult<Fr, PoseidonTranscript<Fr>> = MatMult::new(
             LayerId::Input(0),
