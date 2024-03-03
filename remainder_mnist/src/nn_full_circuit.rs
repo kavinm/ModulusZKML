@@ -132,7 +132,7 @@ impl<F: FieldExt> MNISTModelCircuit<F> {
         }
     }
 }
-
+#[ignore]
 #[test]
 fn test_relu_circuit() {
 

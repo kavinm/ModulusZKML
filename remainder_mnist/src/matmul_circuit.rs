@@ -43,15 +43,15 @@ impl<F: FieldExt> GKRCircuit<F> for MatMulCircuit<F> {
 
         let input_matrix = Matrix::new(
             self.input_mle.mle_ref(),
-            log2(self.sample_size) as usize,
-            log2(self.in_features) as usize,
+            self.sample_size as usize,
+            self.in_features as usize,
             self.input_mle.get_prefix_bits(),
         );
 
         let weights_matrix = Matrix::new(
             self.weights_mle.mle_ref(),
-            log2(self.in_features) as usize,
-            log2(self.out_features) as usize,
+            self.in_features as usize,
+            self.out_features as usize,
             self.weights_mle.get_prefix_bits(),
         );
 
