@@ -46,25 +46,29 @@ impl<F: FieldExt> GKRCircuit<F> for MNISTModelCircuit<F> {
 
         let l1_input_matrix = Matrix::new(
             self.mnist_input.input_mle.mle_ref(),
-            0 as usize,
-            log2(self.mnist_input.dim.num_features) as usize,
+            1 as usize,
+            self.mnist_input.dim.num_features,
             self.mnist_input.input_mle.get_prefix_bits(),
         );
 
         let l1_weights_matrix = Matrix::new(
             self.mnist_weights.l1_linear_weights.weights_mle.mle_ref(),
-            log2(self.mnist_weights.l1_linear_weights.dim.in_features) as usize,
-            log2(self.mnist_weights.l1_linear_weights.dim.out_features) as usize,
+            self.mnist_weights.l1_linear_weights.dim.in_features,
+            self.mnist_weights.l1_linear_weights.dim.out_features,
             self.mnist_weights.l1_linear_weights.weights_mle.get_prefix_bits(),
         );
 
         let l1_matmul_out = layers.add_matmult_layer(l1_input_matrix, l1_weights_matrix);
+        dbg!(l1_matmul_out.num_iterated_vars());
+        dbg!(l1_matmul_out.mle_ref().bookkeeping_table().len());
 
         // --- Bias circuit ---
         let l1_bias_builder = BiasBuilder::new(l1_matmul_out, self.mnist_weights.l1_linear_weights.biases_mle.clone());
         let l1_matmul_bias_out = layers.add_gkr(l1_bias_builder);
+        dbg!(l1_matmul_bias_out.num_iterated_vars());
+        dbg!(l1_matmul_bias_out.mle_ref().bookkeeping_table().len());
 
-        // **************************** BEGIN: checking the bits recompute to the mles ****************************
+        // **************************** BEGIN: checking the bits recompute to the result from the first layer ****************************
 
         // --- First we create the positive binary recomp builder ---
         let pos_bin_recomp_builder = PositiveBinaryRecompBuilder::new(self.mnist_input.relu_bin_decomp.clone());
@@ -72,7 +76,7 @@ impl<F: FieldExt> GKRCircuit<F> for MNISTModelCircuit<F> {
 
         // --- Finally, the recomp checker ---
         let recomp_checker_builder = BinaryRecompCheckerBuilder::new(
-            self.mnist_input.input_mle.clone(),
+            l1_matmul_bias_out.clone(),
             self.mnist_input.relu_bin_decomp.clone(),
             pos_bin_recomp_mle,
         );
@@ -89,15 +93,15 @@ impl<F: FieldExt> GKRCircuit<F> for MNISTModelCircuit<F> {
 
         let l2_input_matrix = Matrix::new(
             l1_relu_result.mle_ref(),
-            0 as usize,
-            l1_relu_result.num_iterated_vars() as usize,
+            1 as usize,
+            l1_relu_result.mle_ref().bookkeeping_table().len(),
             l1_relu_result.get_prefix_bits(),
         );
 
         let l2_weights_matrix = Matrix::new(
             self.mnist_weights.l2_linear_weights.weights_mle.mle_ref(),
-            log2(self.mnist_weights.l2_linear_weights.dim.in_features) as usize,
-            log2(self.mnist_weights.l2_linear_weights.dim.out_features) as usize,
+            self.mnist_weights.l2_linear_weights.dim.in_features,
+            self.mnist_weights.l2_linear_weights.dim.out_features,
             self.mnist_weights.l2_linear_weights.weights_mle.get_prefix_bits(),
         );
 
@@ -132,21 +136,20 @@ impl<F: FieldExt> MNISTModelCircuit<F> {
         }
     }
 }
-#[ignore]
+// #[ignore]
 #[test]
-fn test_relu_circuit() {
-
+fn test_full_circuit() {
 
     let l1_dim = NNLinearDimension {
-        in_features: 784,
-        out_features: 200,
+        in_features: 4,
+        out_features: 4,
     };
     let l2_dim = NNLinearDimension {
-        in_features: 200,
-        out_features: 10,
+        in_features: 4,
+        out_features: 4,
     };
     let input_dim = NNLinearInputDimension {
-        num_features: 784,
+        num_features: 4,
     };
     let (mnist_weights, mnist_inputs) = load_dummy_mnist_input_and_weights(
         l1_dim,

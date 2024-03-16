@@ -2,7 +2,7 @@ use ark_std::{log2, test_rng};
 use itertools::Itertools;
 use rand::Rng;
 use rayon::str;
-use remainder::{layer::{matmult::{product_two_matrices, Matrix}, LayerId}, mle::{dense::DenseMle, structs::BinDecomp16Bit}};
+use remainder::{layer::{matmult::{product_two_matrices, Matrix}, LayerId}, mle::{dense::DenseMle, structs::BinDecomp16Bit, Mle}};
 use remainder_shared_types::{halo2curves::FieldExt as Halo2FieldExt, FieldExt, Fr};
 
 use crate::data_pipeline::{MNISTInputData, MNISTWeights, NNLinearDimension, NNLinearInputDimension, NNLinearWeights};
@@ -203,26 +203,29 @@ pub fn load_dummy_mnist_input_data(
         None,
     );
 
+    dbg!("Okay got here! 1");
+    dbg!(input_mle.num_iterated_vars());
     let input_matrix = Matrix::new(
         input_mle.mle_ref(),
-        0 as usize,
-        log2(input_dim.num_features) as usize,
+        1 as usize,
+        input_dim.num_features,
         input_mle.prefix_bits.clone(),
     );
+    dbg!("Okay got here! 2");
 
     let weights_matrix = Matrix::new(
         l1_weights.weights_mle.mle_ref(),
-        log2(l1_weights.dim.in_features) as usize,
-        log2(l1_weights.dim.out_features) as usize,
+        l1_weights.dim.in_features,
+        l1_weights.dim.out_features,
         l1_weights.weights_mle.prefix_bits.clone(),
     );
 
-    println!("INPUT MATRIX {:?}", input_matrix.num_rows_vars);
-    println!("INPUT MATRIX {:?}", input_matrix.num_cols_vars);
-    println!("INPUT MATRIX {:?}", input_mle.mle_ref().bookkeeping_table.len());
-    println!("weights_matrix MATRIX {:?}", weights_matrix.num_rows_vars);
-    println!("weights_matrix MATRIX {:?}", weights_matrix.num_cols_vars);
-    println!("weights_matrix MATRIX {:?}", l1_weights.weights_mle.mle_ref().bookkeeping_table.len());
+    // println!("INPUT MATRIX {:?}", input_matrix.num_rows_vars);
+    // println!("INPUT MATRIX {:?}", input_matrix.num_cols_vars);
+    // println!("INPUT MATRIX {:?}", input_mle.mle_ref().bookkeeping_table.len());
+    // println!("weights_matrix MATRIX {:?}", weights_matrix.num_rows_vars);
+    // println!("weights_matrix MATRIX {:?}", weights_matrix.num_cols_vars);
+    // println!("weights_matrix MATRIX {:?}", l1_weights.weights_mle.mle_ref().bookkeeping_table.len());
 
     let l1_out = product_two_matrices(input_matrix, weights_matrix);
     let l1_out_w_bias = l1_out.iter().zip(

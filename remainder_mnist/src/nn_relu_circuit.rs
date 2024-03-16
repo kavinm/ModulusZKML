@@ -63,10 +63,6 @@ impl<F: FieldExt> GKRCircuit<F> for ReluCircuit<F> {
         let relu_builder = ReLUBuilder::new(self.signed_bin_decomp_mle.clone(), self.relu_in.clone());
         let relu_result = layers.add_gkr(relu_builder);
 
-        // --- Finally, need to subtract relu result from itself to get ZeroMleRef lol ---
-        // let self_sub_builder = SelfSubtractBuilder::new(relu_result);
-        // let final_result = layers.add_gkr(self_sub_builder);
-
         // **************************** END: the actual relu circuit ****************************
 
         Witness {
