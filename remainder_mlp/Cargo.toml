@@ -1,11 +1,11 @@
 [package]
-name = "remainder-mnist"
+name = "remainder-mlp"
 version = "0.1.0"
 edition = "2021"
 
 [[bin]]
-name = "run_mnist_circuit"
-path = "src/bin/run_mnist_circuit.rs"
+name = "run_mlp_circuit"
+path = "src/bin/run_mlp_circuit.rs"
 
 [dependencies]
 ark-bn254 = "0.4.0"

@@ -1,16 +1,14 @@
-use ark_std::log2;
-use itertools::{repeat_n, Itertools};
-use remainder::{expression::ExpressionStandard, layer::{batched::{combine_mles, combine_zero_mle_ref, BatchedLayer}, from_mle, matmult::Matrix, LayerId}, mle::{dense::DenseMle, structs::BinDecomp16Bit, zero::ZeroMleRef, Mle, MleIndex, MleRef}, prover::{input_layer::{combine_input_layers::InputLayerBuilder, ligero_input_layer::LigeroInputLayer, public_input_layer::PublicInputLayer, InputLayer}, GKRCircuit, Layers, Witness}};
-use remainder_shared_types::{transcript::{poseidon_transcript::PoseidonTranscript, Transcript}, FieldExt, Fr};
+use remainder::{layer::{matmult::Matrix, LayerId}, mle::{Mle, MleRef}, prover::{input_layer::{combine_input_layers::InputLayerBuilder, ligero_input_layer::LigeroInputLayer, InputLayer}, GKRCircuit, Layers, Witness}};
+use remainder_shared_types::{transcript::{poseidon_transcript::PoseidonTranscript, Transcript}, FieldExt};
 
-use crate::{bias_builder::BiasBuilder, bits_are_binary_builder::BitsAreBinaryBuilder, circuit_builders::{BinaryRecompCheckerBuilder, PositiveBinaryRecompBuilder}, data_pipeline::{MNISTInputData, MNISTWeights, NNLinearDimension, NNLinearInputDimension}, relu_builder::ReLUBuilder, self_subtract_builder::SelfSubtractBuilder, utils::{generate_16_bit_decomp_signed, load_dummy_mnist_input_and_weights}};
+use crate::{bias_builder::BiasBuilder, bits_are_binary_builder::BitsAreBinaryBuilder, circuit_builders::{BinaryRecompCheckerBuilder, PositiveBinaryRecompBuilder}, data_pipeline::{MNISTInputData, MNISTWeights}, relu_builder::ReLUBuilder};
 
-pub struct MNISTModelCircuit<F: FieldExt> {
+pub struct MLPCircuit<F: FieldExt> {
     pub mnist_weights: MNISTWeights<F>,
     pub mnist_input: MNISTInputData<F>,
 }
 
-impl<F: FieldExt> GKRCircuit<F> for MNISTModelCircuit<F> {
+impl<F: FieldExt> GKRCircuit<F> for MLPCircuit<F> {
     type Transcript = PoseidonTranscript<F>;
 
     fn synthesize(&mut self) -> Witness<F, Self::Transcript> {
@@ -124,7 +122,7 @@ impl<F: FieldExt> GKRCircuit<F> for MNISTModelCircuit<F> {
 }
 
 
-impl<F: FieldExt> MNISTModelCircuit<F> {
+impl<F: FieldExt> MLPCircuit<F> {
     /// Creates a new instance of BinDecomp16BitsAreBinaryCircuit
     pub fn new(
         mnist_weights: MNISTWeights<F>,
@@ -140,16 +138,19 @@ impl<F: FieldExt> MNISTModelCircuit<F> {
 #[test]
 fn test_full_circuit() {
 
+    use crate::data_pipeline::{NNLinearDimension, NNLinearInputDimension};
+    use crate::utils::load_dummy_mnist_input_and_weights;
+
     let l1_dim = NNLinearDimension {
-        in_features: 4,
-        out_features: 4,
+        in_features: 12,
+        out_features: 6,
     };
     let l2_dim = NNLinearDimension {
-        in_features: 4,
-        out_features: 4,
+        in_features: 6,
+        out_features: 3,
     };
     let input_dim = NNLinearInputDimension {
-        num_features: 4,
+        num_features: 12,
     };
     let (mnist_weights, mnist_inputs) = load_dummy_mnist_input_and_weights(
         l1_dim,
@@ -157,7 +158,7 @@ fn test_full_circuit() {
         input_dim,
     );
 
-    let mut circuit = MNISTModelCircuit::new(
+    let mut circuit = MLPCircuit::new(
         mnist_weights, mnist_inputs,
     );
 

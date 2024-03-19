@@ -1,4 +1,4 @@
-use remainder::{expression::ExpressionStandard, layer::LayerBuilder, mle::{bin_decomp_structs::bin_decomp_64_bit::BinDecomp64Bit, dense::DenseMle, zero::ZeroMleRef, Mle}};
+use remainder::{expression::ExpressionStandard, layer::LayerBuilder, mle::{bin_decomp_structs::bin_decomp_64_bit::BinDecomp64Bit, dense::DenseMle, structs::BinDecomp16Bit, zero::ZeroMleRef, Mle}};
 use remainder_shared_types::FieldExt;
 
 pub struct BitsAreBinaryBuilder<F: FieldExt> {

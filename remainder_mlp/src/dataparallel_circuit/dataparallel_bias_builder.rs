@@ -1,4 +1,4 @@
-use remainder::{expression::ExpressionStandard, layer::LayerBuilder, mle::{dense::{DenseMle, DenseMleRef}, structs::BinDecomp64Bit, zero::ZeroMleRef, Mle}};
+use remainder::{expression::ExpressionStandard, layer::LayerBuilder, mle::{dense::{DenseMle, DenseMleRef}, zero::ZeroMleRef, Mle}};
 use remainder_shared_types::FieldExt;
 
 pub struct BiasBuilder<F: FieldExt> {

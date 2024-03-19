@@ -19,6 +19,7 @@ pub mod mle_enum;
 pub mod zero;
 
 pub mod structs;
+pub mod bin_decomp_structs;
 
 //TODO!(Maybe this type needs PartialEq, could be easily implemented with a random id...)
 ///The trait that defines how a semantic Type (T) and a MultiLinearEvaluation containing field elements (F) interact.

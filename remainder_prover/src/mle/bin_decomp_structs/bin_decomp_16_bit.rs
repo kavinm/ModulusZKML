@@ -1,10 +1,8 @@
 use ark_std::log2;
 use itertools::{repeat_n, Itertools};
-use crate::{layer::{batched::combine_mles, combine_mle_refs::combine_mle_refs, LayerId}, mle::{dense::{DenseMle, DenseMleRef}, MleAble}};
+use crate::{layer::{batched::combine_mles, combine_mle_refs::combine_mle_refs, LayerId}, mle::{dense::{get_padded_evaluations_for_list, DenseMle, DenseMleRef}, Mle, MleAble, MleIndex}};
 use remainder_shared_types::FieldExt;
 use serde::{Deserialize, Serialize};
-
-use super::{dense::get_padded_evaluations_for_list, Mle, MleIndex};
 
 /// --- 16-bit binary decomposition ---
 /// Used for the following components of the (circuit) input:

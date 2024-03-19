@@ -2,12 +2,11 @@
 
 use ark_serialize::Read;
 use clap::Parser;
-use remainder_mnist::{data_pipeline::{NNLinearDimension, NNLinearInputDimension}, nn_full_circuit::MLPCircuit, utils::load_dummy_mnist_input_and_weights};
-use remainder_shared_types::{transcript::poseidon_transcript::PoseidonTranscript, Fr};
+use remainder_mlp::{nn_full_circuit::MLPCircuit, utils::load_dummy_mlp_input_and_weights};
 
 use remainder::prover::{GKRCircuit, GKRError, GKRProof};
 
-use remainder_shared_types::transcript::Transcript;
+use remainder_shared_types::{transcript::Transcript, Fr};
 use remainder_shared_types::FieldExt;
 
 use std::{
@@ -43,17 +42,18 @@ pub enum MLPBinaryError {
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    /// Length of input vector.
+
+    /// Input dim length
     #[arg(long)]
     input_dim: usize,
 
-    /// Intermediate/hidden layer length.
-    #[arg(long)]
-    hidden_dim: usize,
-
-    /// Output number of classes.
+    /// Output dim length
     #[arg(long)]
     output_dim: usize,
+
+    /// List of hidden dims
+    #[arg(long, value_delimiter = ',', num_args = 1..)]
+    hidden_dims: Option<Vec<usize>>,
 
     /// Whether we want the proof to be verified or not.
     #[arg(long, default_value_t = false)]
@@ -206,24 +206,13 @@ fn main() -> Result<(), MLPBinaryError> {
     debug!(args_as_string);
 
     // --- Create the actual linear model ---
-    let l1_dim = NNLinearDimension {
-        in_features: args.input_dim,
-        out_features: args.hidden_dim,
-    };
-    let l2_dim = NNLinearDimension {
-        in_features: args.hidden_dim,
-        out_features: args.output_dim,
-    };
-    let input_dim = NNLinearInputDimension {
-        num_features: args.input_dim,
-    };
-    let (mnist_weights, mnist_inputs) = load_dummy_mnist_input_and_weights(
-        l1_dim,
-        l2_dim,
-        input_dim,
+    let (mnist_weights, mnist_inputs) = load_dummy_mlp_input_and_weights::<Fr>(
+        args.input_dim,
+        args.hidden_dims,
+        args.output_dim,
     );
 
-    let circuit = MLPCircuit::new(
+    let circuit = MLPCircuit::<Fr>::new(
         mnist_weights, mnist_inputs,
     );
 

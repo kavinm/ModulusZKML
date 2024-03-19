@@ -1,4 +1,4 @@
-use remainder::{expression::ExpressionStandard, layer::LayerBuilder, mle::{bin_decomp_structs::bin_decomp_64_bit::BinDecomp64Bit, dense::DenseMle, zero::ZeroMleRef, Mle}};
+use remainder::{expression::ExpressionStandard, layer::LayerBuilder, mle::{bin_decomp_structs::bin_decomp_64_bit::BinDecomp64Bit, dense::DenseMle, structs::BinDecomp16Bit, zero::ZeroMleRef, Mle}};
 use remainder_shared_types::FieldExt;
 use remainder::layer::LayerId;
 use remainder::mle::MleIndex;
@@ -12,7 +12,7 @@ use remainder::mle::MleIndex;
 /// This builder computes the positive binary recomposition
 /// \sum_{b_1, ... b_{15}} 2^{15 - i} * b_i
 pub struct PositiveBinaryRecompBuilder<F: FieldExt> {
-    diff_signed_bin_decomp: DenseMle<F, BinDecomp64Bit<F>>,
+    diff_signed_bin_decomp: DenseMle<F, BinDecomp16Bit<F>>,
 }
 impl<F: FieldExt> LayerBuilder<F> for PositiveBinaryRecompBuilder<F> {
     type Successor = DenseMle<F, F>;
@@ -57,7 +57,7 @@ impl<F: FieldExt> LayerBuilder<F> for PositiveBinaryRecompBuilder<F> {
 }
 impl<F: FieldExt> PositiveBinaryRecompBuilder<F> {
     /// Constructor
-    pub fn new(diff_signed_bin_decomp: DenseMle<F, BinDecomp64Bit<F>>) -> Self {
+    pub fn new(diff_signed_bin_decomp: DenseMle<F, BinDecomp16Bit<F>>) -> Self {
         Self {
             diff_signed_bin_decomp
         }

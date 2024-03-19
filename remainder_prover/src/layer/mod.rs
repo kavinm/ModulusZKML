@@ -287,9 +287,10 @@ impl<F: FieldExt, Tr: Transcript<F>> Layer<F> for GKRLayer<F, Tr> {
         // --- Initialize tables and compute prover message for first round of sumcheck ---
         let (first_sumcheck_message, num_sumcheck_rounds) = self.start_sumcheck(claim)?;
         if val != first_sumcheck_message[0] + first_sumcheck_message[1] {
-            dbg!(&val);
-            dbg!(first_sumcheck_message[0] + first_sumcheck_message[1]);
-            dbg!(&self.expression);
+            dbg!("Yikes we got sumcheck error: prover-side");
+            // dbg!(&val);
+            // dbg!(first_sumcheck_message[0] + first_sumcheck_message[1]);
+            // dbg!(&self.expression);
         }
 
         info!("Proving GKR Layer");

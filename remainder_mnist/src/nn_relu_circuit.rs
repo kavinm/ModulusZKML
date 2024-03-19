@@ -1,13 +1,13 @@
 use ark_std::log2;
 use itertools::{repeat_n, Itertools};
-use remainder::{expression::ExpressionStandard, layer::{batched::{combine_mles, combine_zero_mle_ref, BatchedLayer}, from_mle, LayerId}, mle::{dense::DenseMle, structs::BinDecomp16Bit, zero::ZeroMleRef, Mle, MleIndex, MleRef}, prover::{input_layer::{combine_input_layers::InputLayerBuilder, ligero_input_layer::LigeroInputLayer, public_input_layer::PublicInputLayer, InputLayer}, GKRCircuit, Layers, Witness}};
+use remainder::{expression::ExpressionStandard, layer::{batched::{combine_mles, combine_zero_mle_ref, BatchedLayer}, from_mle, LayerId}, mle::{bin_decomp_structs::bin_decomp_64_bit::BinDecomp64Bit, dense::DenseMle, zero::ZeroMleRef, Mle, MleIndex, MleRef}, prover::{input_layer::{combine_input_layers::InputLayerBuilder, ligero_input_layer::LigeroInputLayer, public_input_layer::PublicInputLayer, InputLayer}, GKRCircuit, Layers, Witness}};
 use remainder_shared_types::{transcript::{poseidon_transcript::PoseidonTranscript, Transcript}, FieldExt, Fr};
 
 use crate::{bits_are_binary_builder::BitsAreBinaryBuilder, circuit_builders::{BinaryRecompCheckerBuilder, PositiveBinaryRecompBuilder}, relu_builder::ReLUBuilder, self_subtract_builder::SelfSubtractBuilder, utils::generate_16_bit_decomp_signed};
 
 pub struct ReluCircuit<F: FieldExt> {
     pub relu_in: DenseMle<F, F>,
-    pub signed_bin_decomp_mle: DenseMle<F, BinDecomp16Bit<F>>,
+    pub signed_bin_decomp_mle: DenseMle<F, BinDecomp64Bit<F>>,
 }
 
 impl<F: FieldExt> GKRCircuit<F> for ReluCircuit<F> {
