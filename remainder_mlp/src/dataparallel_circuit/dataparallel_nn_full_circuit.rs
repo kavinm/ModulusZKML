@@ -1,3 +1,4 @@
+use ark_std::log2;
 use itertools::Itertools;
 use remainder::{layer::{matmult::Matrix, LayerId}, mle::{bin_decomp_structs::bin_decomp_64_bit::BinDecomp64Bit, dense::DenseMle, Mle, MleRef}, prover::{input_layer::{combine_input_layers::InputLayerBuilder, ligero_input_layer::LigeroInputLayer, InputLayer}, GKRCircuit, Layers, Witness}};
 use remainder_shared_types::{transcript::{poseidon_transcript::PoseidonTranscript, Transcript}, FieldExt};
@@ -43,7 +44,9 @@ impl<F: FieldExt> GKRCircuit<F> for DataparallelMLPCircuit<F> {
 
         // --- Create `Layers` struct to add layers to ---
         let mut layers: Layers<F, Self::Transcript> = Layers::new();
-        // let layers_mut_ref = &mut layers;
+
+        // --- Dataparallel stuff ---
+        let num_dataparallel_bits = log2(self.mlp_input.input_mles.len()) as usize;
 
         // **************************** BEGIN: checking the bits are binary ****************************
 

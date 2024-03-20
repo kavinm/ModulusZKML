@@ -2,14 +2,13 @@ use remainder::{expression::ExpressionStandard, layer::LayerBuilder, mle::{bin_d
 use remainder_shared_types::FieldExt;
 
 pub struct DataparallelBitsAreBinaryBuilder<F: FieldExt> {
-    signed_bin_decomp_mle_vec: Vec<DenseMle<F, BinDecomp64Bit<F>>>,
+    signed_bin_decomp_mle: DenseMle<F, BinDecomp64Bit<F>>,
 }
 
 impl<F: FieldExt> LayerBuilder<F> for DataparallelBitsAreBinaryBuilder<F> {
     type Successor = ZeroMleRef<F>;
 
     fn build_expression(&self) -> ExpressionStandard<F> {
-        dbg!(format!("{:?}", repr))
         let signed_bit_mle_ref = self.signed_bin_decomp_mle.get_entire_mle_as_mle_ref();
         ExpressionStandard::Mle(signed_bit_mle_ref.clone()) - ExpressionStandard::Product(vec![signed_bit_mle_ref.clone(), signed_bit_mle_ref.clone()])
     }
@@ -22,10 +21,10 @@ impl<F: FieldExt> LayerBuilder<F> for DataparallelBitsAreBinaryBuilder<F> {
 impl<F: FieldExt> DataparallelBitsAreBinaryBuilder<F> {
     /// constructor for our bits are binary layer builder!
     pub fn new(
-        signed_bin_decomp_mle_vec: Vec<DenseMle<F, BinDecomp64Bit<F>>>,
+        signed_bin_decomp_mle: DenseMle<F, BinDecomp64Bit<F>>,
     ) -> Self {
         Self {
-            signed_bin_decomp_mle_vec
+            signed_bin_decomp_mle
         }
     }
 }
