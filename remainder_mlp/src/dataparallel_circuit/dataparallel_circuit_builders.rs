@@ -76,20 +76,38 @@ impl<F: FieldExt> PositiveBinaryRecompBuilder<F> {
 pub struct BinaryRecompCheckerBuilder<F: FieldExt> {
     mle: DenseMle<F, F>,
     signed_bit_decomp_mle: DenseMle<F, BinDecomp64Bit<F>>,
-    positive_recomp_mle: DenseMle<F, F>,
 }
 impl<F: FieldExt> LayerBuilder<F> for BinaryRecompCheckerBuilder<F> {
     type Successor = ZeroMleRef<F>;
 
     fn build_expression(&self) -> ExpressionStandard<F> {
 
+        let b_s_initial_acc = ExpressionStandard::Constant(F::zero());
+
+        let bit_mle_refs = self.signed_bit_decomp_mle.mle_bit_refs();
+
+        let pos_recomp_expr = bit_mle_refs.into_iter().rev().skip(1).rev().enumerate().fold(
+            b_s_initial_acc,
+            |acc_expr, (bit_idx, bin_decomp_mle)| {
+
+                // --- Coeff MLE ref (i.e. b_i) ---
+                let b_i_mle_expression_ptr = Box::new(ExpressionStandard::Mle(bin_decomp_mle));
+
+                // --- Compute (coeff) * 2^{63 - bit_idx} ---
+                let base = F::from(2_u64.pow(bit_idx as u32));
+                let b_s_times_coeff_times_base =
+                    ExpressionStandard::Scaled(b_i_mle_expression_ptr, base);
+
+                acc_expr + b_s_times_coeff_times_base
+            },
+        );
+
         // --- Grab MLE refs ---
-        let positive_recomp_mle_ref = self.positive_recomp_mle.mle_ref();
         let signed_bit_mle_ref = self.signed_bit_decomp_mle.mle_bit_refs()[self.signed_bit_decomp_mle.mle_bit_refs().len() - 1].clone();
         let diff_mle_ref = self.mle.mle_ref();
 
         // --- LHS of addition ---
-        let pos_recomp_minus_diff = ExpressionStandard::Mle(positive_recomp_mle_ref) - ExpressionStandard::Mle(diff_mle_ref.clone());
+        let pos_recomp_minus_diff = pos_recomp_expr - ExpressionStandard::Mle(diff_mle_ref.clone());
 
         // --- RHS of addition ---
         let sign_bit_times_diff_ptr = Box::new(ExpressionStandard::Product(vec![signed_bit_mle_ref, diff_mle_ref]));
@@ -100,7 +118,7 @@ impl<F: FieldExt> LayerBuilder<F> for BinaryRecompCheckerBuilder<F> {
 
     fn next_layer(&self, id: LayerId, prefix_bits: Option<Vec<MleIndex<F>>>) -> Self::Successor {
 
-        ZeroMleRef::new(self.positive_recomp_mle.num_iterated_vars(), prefix_bits, id)
+        ZeroMleRef::new(self.mle.num_iterated_vars(), prefix_bits, id)
     }
 }
 impl<F: FieldExt> BinaryRecompCheckerBuilder<F> {
@@ -108,12 +126,10 @@ impl<F: FieldExt> BinaryRecompCheckerBuilder<F> {
     pub fn new(
         mle: DenseMle<F, F>,
         signed_bit_decomp_mle: DenseMle<F, BinDecomp64Bit<F>>,
-        positive_recomp_mle: DenseMle<F, F>,
     ) -> Self {
         Self {
             mle,
             signed_bit_decomp_mle,
-            positive_recomp_mle
         }
     }
 }
