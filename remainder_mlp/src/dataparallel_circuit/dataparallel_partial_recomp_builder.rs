@@ -29,8 +29,8 @@ impl<F: FieldExt> LayerBuilder<F> for PartialPositiveBinaryRecompBuilder<F> {
         let b_s_initial_acc = ExpressionStandard::Constant(F::zero());
 
         // --- We want to iterate through the last (most significant) `recomp_bitwidth` - 1 bits (save one bit for b_s) ---
-        let start_bit_idx = 63 - self.recomp_bitwidth;
-        bit_mle_refs.into_iter().skip(start_bit_idx).rev().skip(1).enumerate().fold(
+
+        bit_mle_refs.into_iter().take(self.recomp_bitwidth - 1).enumerate().fold(
             b_s_initial_acc,
             |acc_expr, (bit_idx, bin_decomp_mle)| {
 
@@ -38,7 +38,7 @@ impl<F: FieldExt> LayerBuilder<F> for PartialPositiveBinaryRecompBuilder<F> {
                 let b_i_mle_expression_ptr = Box::new(ExpressionStandard::Mle(bin_decomp_mle));
 
                 // --- Compute (coeff) * 2^{63 - bit_idx} ---
-                let base = F::from(2_u64.pow((self.recomp_bitwidth - bit_idx - 2) as u32));
+                let base = F::from(2_u64.pow(bit_idx as u32));
                 let b_s_times_coeff_times_base =
                     ExpressionStandard::Scaled(b_i_mle_expression_ptr, base);
 
@@ -51,9 +51,8 @@ impl<F: FieldExt> LayerBuilder<F> for PartialPositiveBinaryRecompBuilder<F> {
 
         let result_iter = self.signed_bin_decomp.into_iter().map(
             |signed_bin_decomp| {
-                let start_bit_idx = 63 - self.recomp_bitwidth;
-                signed_bin_decomp.bits.into_iter().skip(start_bit_idx).rev().skip(1).enumerate().fold(F::zero(), |acc, (bit_idx, cur_bit)| {
-                    let base = F::from(2_u64.pow((self.recomp_bitwidth - bit_idx - 2) as u32));
+                signed_bin_decomp.bits.into_iter().take(self.recomp_bitwidth - 1).enumerate().fold(F::zero(), |acc, (bit_idx, cur_bit)| {
+                    let base = F::from(2_u64.pow(bit_idx as u32));
                     acc + base * cur_bit
                 })
             }

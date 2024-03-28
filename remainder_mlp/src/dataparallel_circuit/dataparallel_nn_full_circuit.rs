@@ -1,9 +1,11 @@
 use ark_std::log2;
 use itertools::Itertools;
 use remainder::{layer::{matmult::Matrix, LayerId}, mle::{bin_decomp_structs::bin_decomp_64_bit::BinDecomp64Bit, dense::DenseMle, Mle, MleRef}, prover::{input_layer::{combine_input_layers::InputLayerBuilder, ligero_input_layer::LigeroInputLayer, InputLayer}, GKRCircuit, Layers, Witness}};
+use remainder::prover::input_layer::public_input_layer::PublicInputLayer;
 use remainder_shared_types::{transcript::{poseidon_transcript::PoseidonTranscript, Transcript}, FieldExt};
 
 use crate::dims::{DataparallelMLPInputData, MLPWeights};
+use crate::{bias_builder::BiasBuilder, bits_are_binary_builder::BitsAreBinaryBuilder, circuit_builders::{BinaryRecompCheckerBuilder, PositiveBinaryRecompBuilder}, dims::MLPInputData, partial_recomp_builder::PartialPositiveBinaryRecompBuilder, relu_builder::ReLUBuilder};
 
 use super::dataparallel_bits_are_binary_builder::DataparallelBitsAreBinaryBuilder;
 
@@ -16,6 +18,8 @@ impl<F: FieldExt> GKRCircuit<F> for DataparallelMLPCircuit<F> {
     type Transcript = PoseidonTranscript<F>;
 
     fn synthesize(&mut self) -> Witness<F, Self::Transcript> {
+
+        const RECOMP_BITWIDTH: usize = 32;
 
         // --- Inputs to the circuit include model inputs, weights, biases, and decomps ---
         let combined_input_mles = DenseMle::<F, F>::combine_mle_batch(self.mlp_input.input_mles.clone());
@@ -50,10 +54,18 @@ impl<F: FieldExt> GKRCircuit<F> for DataparallelMLPCircuit<F> {
 
         // **************************** BEGIN: checking the bits are binary ****************************
 
+        // --- Create the builders for (b_i)^2 - b_i (but for all layers) ---
+        // NOTE(ryancao): This is replaced by the below!!!
+        // let bits_are_binary_results = self.mlp_input.relu_bin_decomp.clone().into_iter().map(|bin_decomp_mle| {
+        //     let bits_are_binary_builder = BitsAreBinaryBuilder::new(bin_decomp_mle);
+        //     let bits_are_binary_result = layers_mut_ref.add_gkr(bits_are_binary_builder);
+        //     bits_are_binary_result
+        // });
+
         // --- Unfortunate hacky way to avoid closure to avoid borrowing `layers` as mutable multiple times in the same scope ---
         let mut bits_are_binary_zero_mle_refs = vec![];
         for bin_decomp_mle in self.mlp_input.relu_bin_decomp.clone() {
-            let bits_are_binary_builder = DataparallelBitsAreBinaryBuilder::new(bin_decomp_mle);
+            let bits_are_binary_builder = DataparallelBitsAreBinaryBuilder::new(bin_decomp_mle[0]); // ad hoc
             let bits_are_binary_result = layers.add_gkr(bits_are_binary_builder);
             bits_are_binary_zero_mle_refs.push(bits_are_binary_result);
         }
@@ -67,15 +79,15 @@ impl<F: FieldExt> GKRCircuit<F> for DataparallelMLPCircuit<F> {
             .rev()
             // ----------------------------------------------------
             .zip(self.mlp_input.relu_bin_decomp.clone().into_iter())
-            .fold((vec![], self.mlp_input.input_mle.clone()), 
+            .fold((vec![], self.mlp_input.input_mles.clone()), 
             |(recomp_checker_zero_mle_refs_acc, last_hidden_layer_vals_mle), (linear_weight_bias, relu_bin_decomp)| {
 
                 // --- Construct input/weight matrices and compute matmul ---
                 let hidden_layer_vals_matrix = Matrix::new(
-                    last_hidden_layer_vals_mle.mle_ref(),
+                    last_hidden_layer_vals_mle[0].mle_ref(), // ad hoc
                     1 as usize,
-                    last_hidden_layer_vals_mle.mle_ref().bookkeeping_table().len(),
-                    last_hidden_layer_vals_mle.get_prefix_bits(),
+                    last_hidden_layer_vals_mle[0].mle_ref().bookkeeping_table().len(),
+                    last_hidden_layer_vals_mle[0].get_prefix_bits(),
                 );
 
                 let weights_matrix = Matrix::new(
@@ -96,19 +108,21 @@ impl<F: FieldExt> GKRCircuit<F> for DataparallelMLPCircuit<F> {
                 // dbg!(matmul_bias_out.mle_ref().bookkeeping_table().len());
 
                 // --- Check that the bin decomp is correct with respect to the current outputs ---
-                let partial_pos_bin_recomp_builder = PartialPositiveBinaryRecompBuilder::new(relu_bin_decomp.clone(), 16);
+                let partial_pos_bin_recomp_builder = PartialPositiveBinaryRecompBuilder::new(
+                    relu_bin_decomp[0].clone(), // ad hoc
+                    RECOMP_BITWIDTH
+                );
                 let partial_pos_bin_recomp_mle = layers.add_gkr(partial_pos_bin_recomp_builder);
 
                 // --- Next, the recomp checker ---
                 let recomp_checker_builder = BinaryRecompCheckerBuilder::new(
                     matmul_bias_out.clone(),
-                    relu_bin_decomp.clone(),
-                    partial_pos_bin_recomp_mle,
+                    relu_bin_decomp[0].clone(),
                 );
                 let recomp_checker_result = layers.add_gkr(recomp_checker_builder);
 
                 // --- Finally, the actual ReLU circuit ---
-                let relu_builder = ReLUBuilder::new(relu_bin_decomp, matmul_bias_out);
+                let relu_builder = ReLUBuilder::new(relu_bin_decomp[0], partial_pos_bin_recomp_mle);
                 let relu_result = layers.add_gkr(relu_builder);
 
                 let new_recomp_checker_zero_mle_refs_acc = recomp_checker_zero_mle_refs_acc
@@ -117,15 +131,15 @@ impl<F: FieldExt> GKRCircuit<F> for DataparallelMLPCircuit<F> {
                     .collect_vec();
 
                 // --- Updated ZeroMLERefs, updated hidden layer state ---
-                (new_recomp_checker_zero_mle_refs_acc, relu_result)
+                (new_recomp_checker_zero_mle_refs_acc, vec![relu_result]) // ad hoc
         });
 
         // --- Finally, compute the final matmul/bias layer, without ReLU ---
         let final_hidden_layer_vals_matrix = Matrix::new(
-            penultimate_hidden_layer_mle.mle_ref(),
+            penultimate_hidden_layer_mle[0].mle_ref(), // ad hoc
             1 as usize,
-            penultimate_hidden_layer_mle.mle_ref().bookkeeping_table().len(),
-            penultimate_hidden_layer_mle.get_prefix_bits(),
+            penultimate_hidden_layer_mle[0].mle_ref().bookkeeping_table().len(),
+            penultimate_hidden_layer_mle[0].get_prefix_bits(),
         );
 
         let last_linear_weight_bias = self.mlp_weights.all_linear_weights_biases.last().unwrap();
@@ -141,6 +155,8 @@ impl<F: FieldExt> GKRCircuit<F> for DataparallelMLPCircuit<F> {
         // --- Bias circuit ---
         let final_bias_builder = BiasBuilder::new(final_matmul_out, last_linear_weight_bias.clone().biases_mle);
         let final_matmul_bias_out = layers.add_gkr(final_bias_builder);
+
+        // println!("final_matmul_bias_out {:?}", final_matmul_bias_out);
 
         // --- Output layers include bits are binary checks, recomp checks, and the final result ---
         let output_layers = std::iter::once(final_matmul_bias_out.mle_ref().get_enum())
@@ -165,7 +181,7 @@ impl<F: FieldExt> DataparallelMLPCircuit<F> {
     /// Creates a new instance of DataparallelMLPCircuit
     pub fn new(
         mlp_weights: MLPWeights<F>,
-        mlp_input: MLPInputData<F>,
+        mlp_input: DataparallelMLPInputData<F>,
     ) -> Self {
         Self {
             mlp_weights,
@@ -189,7 +205,7 @@ fn test_full_circuit() {
     );
 
     let mut circuit = DataparallelMLPCircuit::<Fr>::new(
-        mnist_weights, mnist_inputs, 2,
+        mnist_weights, mnist_inputs,
     );
 
     let mut transcript = PoseidonTranscript::new("Relu Circuit Transcript");

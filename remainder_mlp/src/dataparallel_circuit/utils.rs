@@ -84,6 +84,8 @@ pub fn compute_hidden_layer_values_and_bin_decomps<F: FieldExt>(
             );
             let affine_out = product_two_matrices(input_matrix, weights_matrix);
 
+            // println!("affine_out: {:?}", affine_out);
+
             // --- x^T A + b ---
             let linear_out = affine_out.into_iter().zip(
                 biases_mle.mle.iter()
@@ -91,15 +93,23 @@ pub fn compute_hidden_layer_values_and_bin_decomps<F: FieldExt>(
                 x + bias
             }).collect_vec();
 
+            // println!("linear_out: {:?}", linear_out);
+
             // --- Compute 64-bit bin decomp of `linear_out`, as required for ReLU in circuit ---
             let relu_decomp: Vec<BinDecomp64Bit<F>> = linear_out.iter().map(|x| {
+                // println!("x: {:?}", x.get_lower_128());
                 let mut field_elem_i64_repr = x.get_lower_128() as i64;
                 if *x > F::from(1 << 63) {
-                    field_elem_i64_repr = -1 * (x.neg().get_lower_128() as i64);
+                    // println!("x: {:?}", x.get_lower_128());
+                    assert!(x.neg().get_lower_128() < (1<<63));
+                    field_elem_i64_repr = -1 * (x.neg().get_lower_128() as i64); // maybe assert
                 }
+                // println!("field_elem_i64_repr: {:?}", field_elem_i64_repr);
                 let decomp = build_signed_bit_decomposition(field_elem_i64_repr, 64).unwrap();
                 BinDecomp64Bit::<F>::from(decomp)
             }).collect_vec();
+
+            // println!("relu_decomp: {:?}", relu_decomp);
 
             let relu_decomp_mle = DenseMle::new_from_iter(
                 relu_decomp.clone().into_iter(),
@@ -111,9 +121,13 @@ pub fn compute_hidden_layer_values_and_bin_decomps<F: FieldExt>(
             // let post_relu_bookkeeping_table = linear_out.into_iter().map(|x| {
             //     x.max(F::zero())
             // });
+            // println!("relu_decomp_mle: {:?}", relu_decomp_mle);
             let post_relu_bookkeeping_table = compute_signed_pos_16_bit_recomp_from_64_bit_decomp(relu_decomp);
+            // println!("post_relu_bookkeeping_table: {:?}", post_relu_bookkeeping_table);
 
             let next_hidden_layer_vals_mle = DenseMle::new_from_raw(post_relu_bookkeeping_table, LayerId::Input(0), None);
+
+            // println!("next_hidden_layer_vals_mle: {:?}", next_hidden_layer_vals_mle);
             let new_hidden_values_decomp_acc = hidden_values_decomp_acc
                 .into_iter()
                 .chain(std::iter::once(relu_decomp_mle))
@@ -121,6 +135,33 @@ pub fn compute_hidden_layer_values_and_bin_decomps<F: FieldExt>(
 
             return (new_hidden_values_decomp_acc, next_hidden_layer_vals_mle);
     });
+
+
+    // --- Construct matrices for x^T A ---
+    let last_input_matrix = Matrix::new(
+        final_val.mle_ref(),
+        1 as usize,
+        final_val.mle_ref().bookkeeping_table().len(),
+        final_val.prefix_bits.clone(),
+    );
+
+    let last_weights = mlp_weights_biases.all_linear_weights_biases[mlp_weights_biases.all_linear_weights_biases.len() - 1].clone();
+    let weights_matrix = Matrix::new(
+        last_weights.weights_mle.mle_ref(),
+        last_weights.dim.in_features,
+        last_weights.dim.out_features,
+        last_weights.weights_mle.prefix_bits.clone(),
+    );
+    let affine_out = product_two_matrices(last_input_matrix, weights_matrix);
+
+    // --- x^T A + b ---
+    let _final_out = affine_out.into_iter().zip(
+        last_weights.biases_mle.mle.iter()
+    ).map(|(x, bias)| {
+        x + bias
+    }).collect_vec();
+
+    // println!("final_out: {:?}", final_out);
 
     MLPInputData {
         input_mle: input_mle.clone(),
@@ -135,22 +176,25 @@ pub fn compute_hidden_layer_values_and_bin_decomps<F: FieldExt>(
 pub fn compute_signed_pos_16_bit_recomp_from_64_bit_decomp<F: FieldExt>(bit_decomps_64_bit: Vec<BinDecomp64Bit<F>>) -> Vec<F> {
 
     const ORIG_BITWIDTH: usize = 64;
-    const RECOMP_BITWIDTH: usize = 16;
+    const RECOMP_BITWIDTH: usize = 32;
 
     let result_iter = bit_decomps_64_bit.into_iter().map(
         |signed_bin_decomp| {
-            let start_bit_idx = ORIG_BITWIDTH - RECOMP_BITWIDTH;
-            signed_bin_decomp.bits
-                .into_iter()
-                .skip(start_bit_idx)
-                .rev()
-                .skip(1)
-                .enumerate()
-                .fold(F::zero(), |acc, (bit_idx, cur_bit)| {
-                    let base = F::from(2_u64.pow((RECOMP_BITWIDTH - bit_idx - 2) as u32));
-                    acc + base * cur_bit
-                }
-            )
+
+            // if the decomp is negative, return 0, as per relu
+            if signed_bin_decomp.bits[ORIG_BITWIDTH-1] == F::one() {
+                F::zero()
+            } else {
+                assert_eq!(signed_bin_decomp.bits[ORIG_BITWIDTH-1], F::zero());
+                signed_bin_decomp.bits
+                    .into_iter()
+                    .take(RECOMP_BITWIDTH-1)
+                    .enumerate()
+                    .fold(F::zero(), |acc, (bit_idx, cur_bit)| {
+                        let base = F::from(2_u64.pow(bit_idx as u32));
+                        acc + base * cur_bit
+                    })
+            }
         }
     );
 
