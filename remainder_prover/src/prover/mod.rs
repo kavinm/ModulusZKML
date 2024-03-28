@@ -907,6 +907,19 @@ pub trait GKRCircuit<F: FieldExt> {
                 input_layer.layer_id
             ));
 
+            // println!("input_layer_claims: {:?}", input_layer_claims);
+
+            // let input_layer_claims = if input_layer.layer_id == LayerId::Input(3) {input_layer_claims
+            //     .iter()
+            //     .filter(|claim| claim.from_layer_id == Some(LayerId::Layer(5)))
+            //     .cloned()
+            //     .collect::<Vec<Claim<F>>>()
+            // } else {
+            //     input_layer_claims.to_vec()
+            // };
+
+            // println!("input_layer_claims: {:?}", input_layer_claims);
+
             
             let input_layer_claim = if input_layer_claims.len() > 1 {
                 let (prev_claim, _) = aggregate_claims(

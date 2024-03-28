@@ -88,7 +88,7 @@ impl<F: FieldExt> DenseMle<F, BinDecomp64Bit<F>> {
             let second_prefix = (bit_idx % 4) >= 2;
             let third_prefix = (bit_idx % 8) >= 4;
             let fourth_prefix = (bit_idx % 16) >= 8;
-            let fifth_prefix = (bit_idx % 32) >= 64;
+            let fifth_prefix = (bit_idx % 32) >= 16;
             let sixth_prefix = (bit_idx % 64) >= 32;
 
             let mle_indices = self

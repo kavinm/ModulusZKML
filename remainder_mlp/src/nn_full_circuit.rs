@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use remainder::{layer::{matmult::Matrix, LayerId}, mle::{Mle, MleRef}, prover::{input_layer::{combine_input_layers::InputLayerBuilder, ligero_input_layer::LigeroInputLayer, InputLayer}, GKRCircuit, Layers, Witness}};
+use remainder::{layer::{matmult::Matrix, LayerId}, mle::{Mle, MleRef}, prover::{input_layer::{combine_input_layers::InputLayerBuilder, ligero_input_layer::LigeroInputLayer, public_input_layer::PublicInputLayer, InputLayer}, GKRCircuit, Layers, Witness}};
 use remainder_shared_types::{transcript::{poseidon_transcript::PoseidonTranscript, Transcript}, FieldExt};
 
 use crate::{bias_builder::BiasBuilder, bits_are_binary_builder::BitsAreBinaryBuilder, circuit_builders::{BinaryRecompCheckerBuilder, PositiveBinaryRecompBuilder}, dims::{MLPInputData, MLPWeights}, partial_recomp_builder::PartialPositiveBinaryRecompBuilder, relu_builder::ReLUBuilder};
@@ -13,6 +13,8 @@ impl<F: FieldExt> GKRCircuit<F> for MLPCircuit<F> {
     type Transcript = PoseidonTranscript<F>;
 
     fn synthesize(&mut self) -> Witness<F, Self::Transcript> {
+
+        const RECOMP_BITWIDTH: usize = 32;
 
         // --- Inputs to the circuit include model inputs, weights, biases, and decomps ---
         let input_mle_box_ptr = Box::new(&mut self.mlp_input.input_mle as &mut dyn Mle<F>);
@@ -94,19 +96,21 @@ impl<F: FieldExt> GKRCircuit<F> for MLPCircuit<F> {
                 // dbg!(matmul_bias_out.mle_ref().bookkeeping_table().len());
 
                 // --- Check that the bin decomp is correct with respect to the current outputs ---
-                let partial_pos_bin_recomp_builder = PartialPositiveBinaryRecompBuilder::new(relu_bin_decomp.clone(), 16);
+                let partial_pos_bin_recomp_builder = PartialPositiveBinaryRecompBuilder::new(
+                    relu_bin_decomp.clone(),
+                    RECOMP_BITWIDTH
+                );
                 let partial_pos_bin_recomp_mle = layers.add_gkr(partial_pos_bin_recomp_builder);
 
                 // --- Next, the recomp checker ---
                 let recomp_checker_builder = BinaryRecompCheckerBuilder::new(
                     matmul_bias_out.clone(),
                     relu_bin_decomp.clone(),
-                    partial_pos_bin_recomp_mle,
                 );
                 let recomp_checker_result = layers.add_gkr(recomp_checker_builder);
 
                 // --- Finally, the actual ReLU circuit ---
-                let relu_builder = ReLUBuilder::new(relu_bin_decomp, matmul_bias_out);
+                let relu_builder = ReLUBuilder::new(relu_bin_decomp, partial_pos_bin_recomp_mle);
                 let relu_result = layers.add_gkr(relu_builder);
 
                 let new_recomp_checker_zero_mle_refs_acc = recomp_checker_zero_mle_refs_acc
@@ -139,6 +143,8 @@ impl<F: FieldExt> GKRCircuit<F> for MLPCircuit<F> {
         // --- Bias circuit ---
         let final_bias_builder = BiasBuilder::new(final_matmul_out, last_linear_weight_bias.clone().biases_mle);
         let final_matmul_bias_out = layers.add_gkr(final_bias_builder);
+
+        // println!("final_matmul_bias_out {:?}", final_matmul_bias_out);
 
         // --- Output layers include bits are binary checks, recomp checks, and the final result ---
         let output_layers = std::iter::once(final_matmul_bias_out.mle_ref().get_enum())

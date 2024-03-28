@@ -58,6 +58,9 @@ impl<F: FieldExt, Tr: Transcript<F>> InputLayer<F> for PublicInputLayer<F, Tr> {
             DenseMle::<F, F>::new_from_raw(commitment.clone(), LayerId::Input(0), None).mle_ref();
         mle_ref.index_mle_indices(0);
 
+        // println!("mle_ref = {:?}", mle_ref);
+        // println!("claim = {:?}", claim);
+
         let eval = if mle_ref.num_vars != 0 {
             let mut eval = None;
             for (curr_bit, &chal) in claim.get_point().iter().enumerate() {
