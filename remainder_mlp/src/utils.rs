@@ -4,7 +4,215 @@ use rand::Rng;
 use remainder::{layer::{matmult::{product_two_matrices, Matrix}, LayerId}, mle::{bin_decomp_structs::bin_decomp_64_bit::BinDecomp64Bit, dense::DenseMle, Mle, MleRef}};
 use remainder_shared_types::FieldExt;
 
-use crate::dims::{MLPInputData, MLPWeights, NNLinearDimension, NNLinearInputDimension, NNLinearWeights};
+use crate::dims::{DataparallelMLPInputData, DataparallelNNLinearInputDimension, MLPInputData, MLPWeights, NNLinearDimension, NNLinearInputDimension, NNLinearWeights};
+
+/// Primary function which we care about!
+pub fn load_batched_dummy_mlp_input_and_weights<F: FieldExt>(
+    input_dim: usize,
+    hidden_dims: Option<Vec<usize>>,
+    output_dim: usize,
+    batch_size: usize,
+) -> (
+    MLPWeights<F>,
+    DataparallelMLPInputData<F>,
+) {
+    // --- Generate random inputs ---
+    let input_mles = vec![gen_random_mle(input_dim, 16); batch_size];
+
+    // --- Generate random weights/biases for all layers ---
+    let all_input_dims = std::iter::once(input_dim)
+        .chain(hidden_dims.clone().unwrap_or(vec![]));
+    let all_output_dims = hidden_dims.unwrap_or(vec![])
+        .into_iter()
+        .chain(std::iter::once(output_dim));
+    let all_linear_weights_biases = all_input_dims.zip(all_output_dims).map(|(input_dim, output_dim)| {
+        NNLinearWeights {
+            weights_mle: gen_random_mle(input_dim * output_dim, 16),
+            biases_mle: gen_random_mle(output_dim, 16),
+            dim: NNLinearDimension {
+                in_features: input_dim,
+                out_features: output_dim,
+            },
+        }
+    }).collect_vec();
+
+    let mlp_weights_biases = MLPWeights {
+        all_linear_weights_biases,
+    };
+
+    // --- Generate bin decomps for all ReLU layers given inputs and weights ---
+    let mlp_input_data = compute_batched_hidden_layer_values_and_bin_decomps(
+        &mlp_weights_biases,
+        input_mles,
+    );
+
+    (mlp_weights_biases, mlp_input_data)
+}
+
+/// We assume that after every linear layer there is a non-linearity,
+/// and therefore compute both the literal values and the bin decomp
+/// for those values for every hidden layer.
+pub fn compute_batched_hidden_layer_values_and_bin_decomps<F: FieldExt>(
+    mlp_weights_biases: &MLPWeights<F>,
+    input_mles: Vec<DenseMle<F, F>>,
+) -> DataparallelMLPInputData<F> {
+
+    let batch_size = input_mles.len();
+    let num_features = input_mles[0].mle_ref().bookkeeping_table().len();
+
+    // --- Basically we are saving the intermediate outputs from BEFORE ReLU is computed ---
+    let (hidden_values_decomp, final_val) = mlp_weights_biases.all_linear_weights_biases
+        .clone()
+        .into_iter()
+        // --- No ReLU for last layer ---
+        .rev()
+        .skip(1)
+        .rev()
+        // ------------------------------
+        .fold((vec![], input_mles.clone()), |(hidden_values_decomp_acc, last_layer_output), linear_weights_biases| {
+
+            let NNLinearWeights { weights_mle, biases_mle, dim } = linear_weights_biases;
+
+            let combined_last_layer_output = DenseMle::<F, F>::combine_mle_batch(last_layer_output.clone());
+
+            // --- Construct matrices for x^T A ---
+            let input_matrix = Matrix::new(
+                combined_last_layer_output.mle_ref(),
+                batch_size as usize,
+                dim.in_features,
+                combined_last_layer_output.prefix_bits.clone(),
+            );
+            let weights_matrix = Matrix::new(
+                weights_mle.mle_ref(),
+                dim.in_features,
+                dim.out_features,
+                weights_mle.prefix_bits.clone(),
+            );
+            let affine_out = product_two_matrices(input_matrix, weights_matrix);
+
+            let affine_out_vec = affine_out.chunks(batch_size)
+                .map(|chunk| chunk.to_vec())
+                .collect_vec();
+
+            assert_eq!(affine_out_vec.len(), batch_size);
+            assert_eq!(affine_out_vec[0].len(), dim.out_features);
+
+            // println!("affine_out: {:?}", affine_out);
+
+            // --- x^T A + b ---
+            let linear_out_vec = affine_out_vec
+                .into_iter()
+                .map(|affine_out| {
+                    affine_out.into_iter().zip(
+                        biases_mle.mle.iter()
+                    ).map(|(x, bias)| {
+                        x + bias
+                    }).collect_vec()
+                }).collect_vec();
+
+            // println!("linear_out: {:?}", linear_out);
+
+            let (mut relu_decomp_mle_vec, mut next_hidden_layer_vals_mle_vec) = (vec![], vec![]);
+            
+            for linear_out in linear_out_vec.into_iter() {
+                // --- Compute 64-bit bin decomp of `linear_out`, as required for ReLU in circuit ---
+                let relu_decomp: Vec<BinDecomp64Bit<F>> = linear_out.iter().map(|x| {
+                    // println!("x: {:?}", x.get_lower_128());
+                    let mut field_elem_i64_repr = x.get_lower_128() as i64;
+                    if *x > F::from(1 << 63) {
+                        // println!("x: {:?}", x.get_lower_128());
+                        assert!(x.neg().get_lower_128() < (1<<63));
+                        field_elem_i64_repr = -1 * (x.neg().get_lower_128() as i64); // maybe assert
+                    }
+                    // println!("field_elem_i64_repr: {:?}", field_elem_i64_repr);
+                    let decomp = build_signed_bit_decomposition(field_elem_i64_repr, 64).unwrap();
+                    BinDecomp64Bit::<F>::from(decomp)
+                }).collect_vec();
+
+                // println!("relu_decomp: {:?}", relu_decomp);
+
+                let relu_decomp_mle = DenseMle::new_from_iter(
+                    relu_decomp.clone().into_iter(),
+                    LayerId::Input(0),
+                    None,
+                );
+
+                // --- Compute ReLU function for next iteration of matmul inputs ---
+                // let post_relu_bookkeeping_table = linear_out.into_iter().map(|x| {
+                //     x.max(F::zero())
+                // });
+                // println!("relu_decomp_mle: {:?}", relu_decomp_mle);
+                let post_relu_bookkeeping_table = compute_signed_pos_16_bit_recomp_from_64_bit_decomp(relu_decomp);
+                // println!("post_relu_bookkeeping_table: {:?}", post_relu_bookkeeping_table);
+
+                let next_hidden_layer_vals_mle = DenseMle::new_from_raw(post_relu_bookkeeping_table, LayerId::Input(0), None);
+
+                relu_decomp_mle_vec.push(relu_decomp_mle);
+                next_hidden_layer_vals_mle_vec.push(next_hidden_layer_vals_mle);
+            }
+
+
+            // println!("next_hidden_layer_vals_mle: {:?}", next_hidden_layer_vals_mle);
+            let new_hidden_values_decomp_acc = hidden_values_decomp_acc
+                .into_iter()
+                .chain(std::iter::once(relu_decomp_mle_vec))
+                .collect_vec();
+
+            return (new_hidden_values_decomp_acc, next_hidden_layer_vals_mle_vec);
+    });
+
+
+    let final_val_combine = DenseMle::<F, F>::combine_mle_batch(final_val.clone());
+    let last_weights = mlp_weights_biases.all_linear_weights_biases[mlp_weights_biases.all_linear_weights_biases.len() - 1].clone();
+
+    // --- Construct matrices for x^T A ---
+    let last_input_matrix = Matrix::new(
+        final_val_combine.mle_ref(),
+        batch_size as usize,
+        last_weights.dim.in_features,
+        final_val_combine.prefix_bits.clone(),
+    );
+
+    let weights_matrix = Matrix::new(
+        last_weights.weights_mle.mle_ref(),
+        last_weights.dim.in_features,
+        last_weights.dim.out_features,
+        last_weights.weights_mle.prefix_bits.clone(),
+    );
+    let affine_out = product_two_matrices(last_input_matrix, weights_matrix);
+
+    let affine_out_vec = affine_out.chunks(batch_size)
+    .map(|chunk| chunk.to_vec())
+    .collect_vec();
+
+    assert_eq!(affine_out_vec.len(), batch_size);
+    assert_eq!(affine_out_vec[0].len(), last_weights.dim.out_features);
+
+    // --- x^T A + b ---
+    let final_out = affine_out_vec
+        .into_iter()
+        .map(|affine_out| {
+            affine_out.into_iter().zip(
+                last_weights.biases_mle.mle.iter()
+            ).map(|(x, bias)| {
+                x + bias
+            }).collect_vec()
+        }).collect_vec();
+
+    assert_eq!(final_out.len(), batch_size);
+    assert_eq!(final_out[0].len(), last_weights.dim.out_features);
+
+    // println!("final_out: {:?}", final_out);
+
+    DataparallelMLPInputData {
+        input_mles,
+        relu_bin_decomp: hidden_values_decomp,
+        dim: DataparallelNNLinearInputDimension {
+            batch_size,
+            num_features,
+        },
+    }
+}
 
 /// Primary function which we care about!
 pub fn load_dummy_mlp_input_and_weights<F: FieldExt>(

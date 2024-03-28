@@ -13,6 +13,12 @@ pub struct NNLinearInputDimension {
 }
 
 #[derive(Clone, Debug)]
+pub struct DataparallelNNLinearInputDimension {
+    pub batch_size: usize,
+    pub num_features: usize,
+}
+
+#[derive(Clone, Debug)]
 pub struct NNLinearWeights<F: FieldExt> {
     pub weights_mle: DenseMle<F, F>,    // represent matrix on the right, note this is the A^T matrix from: https://pytorch.org/docs/stable/generated/torch.nn.Linear.html
                                         // ^ its shape is (in_features, out_features)
@@ -38,6 +44,6 @@ pub struct MLPInputData<F: FieldExt> {
 #[derive(Clone, Debug)]
 pub struct DataparallelMLPInputData<F: FieldExt> {
     pub input_mles: Vec<DenseMle<F, F>>,
-    pub dim: NNLinearInputDimension,
+    pub dim: DataparallelNNLinearInputDimension,
     pub relu_bin_decomp: Vec<Vec<ReluWitness<F>>>,
 }
