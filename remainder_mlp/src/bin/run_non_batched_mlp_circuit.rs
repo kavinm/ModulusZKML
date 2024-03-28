@@ -2,7 +2,8 @@
 
 use ark_serialize::Read;
 use clap::Parser;
-use remainder_mlp::{nn_full_circuit::MLPCircuit, utils::load_dummy_mlp_input_and_weights};
+use remainder_mlp::non_batched_circuit::nn_full_circuit::MLPCircuit;
+use remainder_mlp::utils::load_dummy_mlp_input_and_weights;
 
 use remainder::prover::{GKRCircuit, GKRError, GKRProof};
 

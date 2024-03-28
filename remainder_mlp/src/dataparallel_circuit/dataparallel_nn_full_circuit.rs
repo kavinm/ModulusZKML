@@ -5,10 +5,8 @@ use remainder::prover::input_layer::public_input_layer::PublicInputLayer;
 use remainder_shared_types::{transcript::{poseidon_transcript::PoseidonTranscript, Transcript}, FieldExt};
 
 use crate::dims::{DataparallelMLPInputData, MLPWeights};
-use crate::{bias_builder::BiasBuilder, bits_are_binary_builder::BitsAreBinaryBuilder, circuit_builders::{BinaryRecompCheckerBuilder, PositiveBinaryRecompBuilder}, dims::MLPInputData, partial_recomp_builder::PartialPositiveBinaryRecompBuilder, relu_builder::ReLUBuilder};
-
-use super::dataparallel_bits_are_binary_builder::DataparallelBitsAreBinaryBuilder;
-
+use crate::dataparallel_circuit::{dataparallel_bias_builder::BiasBuilder, dataparallel_bits_are_binary_builder::DataparallelBitsAreBinaryBuilder, dataparallel_circuit_builders::{BinaryRecompCheckerBuilder, PositiveBinaryRecompBuilder}, dataparallel_partial_recomp_builder::PartialPositiveBinaryRecompBuilder, dataparallel_relu_builder::ReLUBuilder};
+use crate::dims::MLPInputData;
 pub struct DataparallelMLPCircuit<F: FieldExt> {
     pub mlp_weights: MLPWeights<F>,
     pub mlp_input: DataparallelMLPInputData<F>,

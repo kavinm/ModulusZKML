@@ -2,7 +2,8 @@ use itertools::Itertools;
 use remainder::{layer::{matmult::Matrix, LayerId}, mle::{Mle, MleRef}, prover::{input_layer::{combine_input_layers::InputLayerBuilder, ligero_input_layer::LigeroInputLayer, public_input_layer::PublicInputLayer, InputLayer}, GKRCircuit, Layers, Witness}};
 use remainder_shared_types::{transcript::{poseidon_transcript::PoseidonTranscript, Transcript}, FieldExt};
 
-use crate::{bias_builder::BiasBuilder, bits_are_binary_builder::BitsAreBinaryBuilder, circuit_builders::{BinaryRecompCheckerBuilder, PositiveBinaryRecompBuilder}, dims::{MLPInputData, MLPWeights}, partial_recomp_builder::PartialPositiveBinaryRecompBuilder, relu_builder::ReLUBuilder};
+use super::{bias_builder::BiasBuilder, bits_are_binary_builder::BitsAreBinaryBuilder, circuit_builders::{BinaryRecompCheckerBuilder, PositiveBinaryRecompBuilder}, partial_recomp_builder::PartialPositiveBinaryRecompBuilder, relu_builder::ReLUBuilder};
+use crate::dims::{MLPInputData, MLPWeights};
 
 pub struct MLPCircuit<F: FieldExt> {
     pub mlp_weights: MLPWeights<F>,
