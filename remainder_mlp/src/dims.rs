@@ -45,5 +45,5 @@ pub struct MLPInputData<F: FieldExt> {
 pub struct DataparallelMLPInputData<F: FieldExt> {
     pub input_mles: Vec<DenseMle<F, F>>,
     pub dim: DataparallelNNLinearInputDimension,
-    pub relu_bin_decomp: Vec<Vec<ReluWitness<F>>>,
+    pub relu_bin_decomp_vecs: Vec<Vec<ReluWitness<F>>>,  // outer vec is layers of mlp, inner vec is batch size
 }

@@ -42,6 +42,10 @@ where
     fn set_prefix_bits(&mut self, new_bits: Option<Vec<MleIndex<F>>>);
 
     fn get_prefix_bits(&self) -> Option<Vec<MleIndex<F>>>;
+
+    fn append_prefix_bits(&mut self, new_bits: Vec<MleIndex<F>>);
+
+    fn add_batch_bits(&mut self, new_batch_bits: usize);
 }
 
 ///MleRef keeps track of an Mle and the fixed indices of the Mle to be used in an expression

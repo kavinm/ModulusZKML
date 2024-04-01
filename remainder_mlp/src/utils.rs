@@ -206,7 +206,7 @@ pub fn compute_batched_hidden_layer_values_and_bin_decomps<F: FieldExt>(
 
     DataparallelMLPInputData {
         input_mles,
-        relu_bin_decomp: hidden_values_decomp,
+        relu_bin_decomp_vecs: hidden_values_decomp,
         dim: DataparallelNNLinearInputDimension {
             batch_size,
             num_features,

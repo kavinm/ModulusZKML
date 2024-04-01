@@ -51,6 +51,19 @@ where
     fn get_prefix_bits(&self) -> Option<Vec<MleIndex<F>>> {
         self.prefix_bits.clone()
     }
+
+    fn append_prefix_bits(&mut self, new_bits: Vec<MleIndex<F>>) {
+        if let Some(mut prefix_bits_prev) = self.get_prefix_bits() {
+            prefix_bits_prev.extend(new_bits);
+            self.set_prefix_bits(Some(prefix_bits_prev))
+        } else {
+            self.set_prefix_bits(Some(new_bits));
+        }
+    }
+
+    fn add_batch_bits(&mut self, new_batch_bits: usize) {
+        self.append_prefix_bits(repeat_n(MleIndex::Iterated, new_batch_bits).collect_vec())
+    }
 }
 
 impl<F: FieldExt, T: Send + Sync + Clone + Debug + MleAble<F>> DenseMle<F, T> {
