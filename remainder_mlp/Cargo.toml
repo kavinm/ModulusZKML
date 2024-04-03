@@ -4,12 +4,12 @@ version = "0.1.0"
 edition = "2021"
 
 [[bin]]
-name = "run_non_batched_mlp_circuit"
-path = "src/bin/run_non_batched_mlp_circuit.rs"
+name = "run_workshop_circuit"
+path = "src/bin/run_workshop_circuit.rs"
 
 [[bin]]
-name = "run_dataparallel_mlp_circuit"
-path = "src/bin/run_dataparallel_mlp_circuit.rs"
+name = "run_soln_workshop_circuit"
+path = "src/bin/run_soln_workshop_circuit.rs"
 
 [dependencies]
 ark-bn254 = "0.4.0"
@@ -35,7 +35,7 @@ ndarray-npy = "0.8.1"
 tracing-subscriber = "0.3.17"
 remainder-ligero = { path = "../remainder_ligero" }
 remainder-shared-types = { path = "../remainder_shared_types" }
-remainder = { path = "../remainder_prover" } # might need this
+remainder = { path = "../remainder_prover" }                    # might need this
 # halo2-base = { git = "https://github.com/axiom-crypto/halo2-lib", tag = "v0.3.0-ce" } # For BN-254 from Halo2
 dyn-clone = "1.0.13"
 dyn-clonable = "0.9.0"

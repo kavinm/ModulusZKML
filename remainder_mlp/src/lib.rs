@@ -1,5 +1,2 @@
-pub mod utils;
-pub mod dims;
-
-pub mod dataparallel_circuit;
-pub mod non_batched_circuit;
+pub mod soln_workshop_exercise_circuit;
+pub mod workshop_exercise_circuit;

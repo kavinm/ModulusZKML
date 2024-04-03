@@ -1,14 +1,14 @@
-//! Executable for Remainder ZKDT prover!
+//! Executable for demo MLP Remainder circuit!
 
 use ark_serialize::Read;
 use clap::Parser;
-use remainder_mlp::non_batched_circuit::nn_full_circuit::MLPCircuit;
-use remainder_mlp::utils::load_dummy_mlp_input_and_weights;
+use remainder_mlp::workshop_exercise_circuit::nn_full_circuit::MLPCircuit;
+use remainder_mlp::workshop_exercise_circuit::workshop_utils::load_dummy_mlp_input_and_weights;
 
 use remainder::prover::{GKRCircuit, GKRError, GKRProof};
 
-use remainder_shared_types::{transcript::Transcript, Fr};
 use remainder_shared_types::FieldExt;
+use remainder_shared_types::{transcript::Transcript, Fr};
 
 use std::{
     fs,
@@ -28,8 +28,6 @@ use tracing_subscriber::{
 use ark_std::{end_timer, start_timer};
 
 #[derive(Error, Debug, Clone)]
-/// Errors for running the binary over inputs and proving/verification
-/// TODO!(ryancao): File-handling errors!
 pub enum MLPBinaryError {
     #[error("GKR Verification failed! Error: {0}")]
     GKRVerificationFailed(GKRError),
@@ -43,7 +41,6 @@ pub enum MLPBinaryError {
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-
     /// Input dim length
     #[arg(long)]
     input_dim: usize,
@@ -53,22 +50,16 @@ struct Args {
     output_dim: usize,
 
     /// List of hidden dims
-    #[arg(long, value_delimiter = ',', num_args = 1..)]
-    hidden_dims: Option<Vec<usize>>,
+    #[arg(long)]
+    hidden_dim: usize,
 
     /// Whether we want the proof to be verified or not.
     #[arg(long, default_value_t = false)]
     verify_proof: bool,
 
-    /// Number of dataparallel bits! NOTE: NOT USED
-    #[arg(long)]
-    log_sample_minibatch_size: Option<usize>,
-
     /// Filepath to where the final GKR proof should be written to.
     /// (Note that not passing in anything here will result in no proof
     /// being written at all.)
-    /// 
-    /// NOTE: NOT USED
     #[arg(long)]
     gkr_proof_to_be_written_filepath: Option<String>,
 
@@ -82,23 +73,12 @@ struct Args {
 
     /// Whether we want info tracing subscriber logs or not.
     /// By default, we use `INFO` as the subscriber level.
-    /// 
-    /// Note that if `debug_tracing_subscriber` is also `true`, 
+    ///
+    /// Note that if `debug_tracing_subscriber` is also `true`,
     /// we will set the tracing subscriber to `DEBUG` (always
     /// use the more detailed of the two).
     #[arg(long, default_value_t = false)]
     info_tracing_subscriber: bool,
-
-    /// sets the value for rho_inv for the ligero commit
-    /// NOTE: NOT USED FOR NOW :[ 
-    #[arg(long, default_value_t = 4)]
-    rho_inv: u8,
-
-    /// sets the matrix ratio (orig_num_cols : num_rows) for ligero commit, will do the dimensions
-    /// to achieve the ratio as close as possible
-    /// NOTE: NOT USED FOR NOW
-    #[arg(long, default_value_t = 1_f64)]
-    matrix_ratio: f64,
 }
 
 /// Runs the actual circuit on the witness data
@@ -192,7 +172,11 @@ fn main() -> Result<(), MLPBinaryError> {
     if args.debug_tracing_subscriber || args.info_tracing_subscriber {
         let subscriber = FmtSubscriber::builder()
             .with_line_number(true)
-            .with_max_level(if args.debug_tracing_subscriber {tracing::Level::DEBUG} else {tracing::Level::INFO})
+            .with_max_level(if args.debug_tracing_subscriber {
+                tracing::Level::DEBUG
+            } else {
+                tracing::Level::INFO
+            })
             .with_level(true)
             .with_span_events(FmtSpan::ENTER | FmtSpan::CLOSE)
             .with_ansi(false)
@@ -207,20 +191,14 @@ fn main() -> Result<(), MLPBinaryError> {
     debug!(args_as_string);
 
     // --- Create the actual linear model ---
-    let (mnist_weights, mnist_inputs) = load_dummy_mlp_input_and_weights::<Fr>(
-        args.input_dim,
-        args.hidden_dims,
-        args.output_dim,
-    );
+    let (mnist_weights, mnist_inputs) =
+        load_dummy_mlp_input_and_weights::<Fr>(args.input_dim, args.hidden_dim, args.output_dim);
 
-    let circuit = MLPCircuit::<Fr>::new(
-        mnist_weights, mnist_inputs,
-    );
+    let circuit = MLPCircuit::<Fr>::new(mnist_weights, mnist_inputs);
 
     // --- Grab the proof filepath to write to and compute the circuit + prove ---
     let maybe_proof_filepath = args
         .gkr_proof_to_be_written_filepath
         .map(|maybe_path| Path::new(&maybe_path).to_owned());
     run_mlp_circuit(circuit, maybe_proof_filepath, args.verify_proof)
-
 }
