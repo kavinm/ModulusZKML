@@ -39,10 +39,10 @@ impl<F: FieldExt> GKRCircuit<F> for MLPCircuit<F> {
 
         // **************************** BEGIN: checking the bits are binary ****************************
 
-        // let bits_are_binary_builder =
-        //     BitsAreBinaryBuilder::new(self.mlp_input.relu_bin_decomp.clone());
-        // let bits_are_binary_result = layers.add_gkr(bits_are_binary_builder);
-        // dbg!(&bits_are_binary_result.get_layer_id());
+        // TODO: Use your code from `bits_are_binary_builder.rs` to create a check
+        // that all of the values within `self.mlp_input.relu_bin_decomp` are actually
+        // binary!
+        let bits_are_binary_result: remainder::mle::zero::ZeroMleRef<F> = todo!();
 
         // **************************** BEGIN: matmul + bias ****************************
         let input_matrix = Matrix::new(
@@ -64,91 +64,66 @@ impl<F: FieldExt> GKRCircuit<F> for MLPCircuit<F> {
                 .weights_mle
                 .get_prefix_bits(),
         );
-        dbg!(&input_matrix);
-        dbg!(&hidden_weights_matrix);
 
         let hidden_matmul_out = layers.add_matmult_layer(input_matrix, hidden_weights_matrix);
 
         // --- Bias circuit ---
-        // dbg!(&hidden_matmul_out);
-        // dbg!(&hidden_matmul_out.layer_id);
-        // dbg!(self
-        //     .mlp_weights
-        //     .hidden_linear_weight_bias
-        //     .biases_mle
-        //     .mle_ref());
-        // let bias_builder = BiasBuilder::new(
-        //     hidden_matmul_out,
-        //     self.mlp_weights
-        //         .hidden_linear_weight_bias
-        //         .biases_mle
-        //         .clone(),
-        // );
-        // let hidden_matmul_bias_out = layers.add_gkr(bias_builder);
-        // dbg!(&hidden_matmul_bias_out.layer_id);
-        // dbg!(&hidden_matmul_bias_out);
+        let bias_builder = BiasBuilder::new(
+            hidden_matmul_out,
+            self.mlp_weights
+                .hidden_linear_weight_bias
+                .biases_mle
+                .clone(),
+        );
+        let hidden_matmul_bias_out = layers.add_gkr(bias_builder);
 
         // **************************** BEGIN: ReLU ****************************
         // --- Check that the bin decomp is correct with respect to the current outputs ---
-        // let pos_bin_recomp_builder =
-        //     BinaryRecompBuilder32Bit::new(self.mlp_input.relu_bin_decomp.clone());
-        // let pos_bin_recomp_mle = layers.add_gkr(pos_bin_recomp_builder);
-        // let recomp_checker_builder = BinaryRecompCheckerBuilder::new(
-        //     hidden_matmul_bias_out.clone(),
-        //     self.mlp_input.relu_bin_decomp.clone(),
-        //     pos_bin_recomp_mle.clone(),
-        // );
-        // let recomp_checker_result = layers.add_gkr(recomp_checker_builder);
+        let pos_bin_recomp_builder =
+            BinaryRecompBuilder32Bit::new(self.mlp_input.relu_bin_decomp.clone());
+        let pos_bin_recomp_mle = layers.add_gkr(pos_bin_recomp_builder);
+        let recomp_checker_builder = BinaryRecompCheckerBuilder::new(
+            hidden_matmul_bias_out.clone(),
+            self.mlp_input.relu_bin_decomp.clone(),
+            pos_bin_recomp_mle.clone(),
+        );
+        let recomp_checker_result = layers.add_gkr(recomp_checker_builder);
 
         // --- Finally, the actual ReLU circuit ---
-        // dbg!(&hidden_matmul_bias_out);
-        // dbg!(&self.mlp_input.relu_bin_decomp.mle_bit_refs()[31]);
-        // let relu_builder = ReLUBuilder::new(
-        //     self.mlp_input.relu_bin_decomp.clone(),
-        //     hidden_matmul_bias_out,
-        // );
-        // let relu_result = layers.add_gkr(relu_builder);
-        // dbg!(&relu_result);
+        // TODO: Use the code within `relu_builder` to instantiate a builder which
+        // computes ReLU(`hidden_matmul_bias_out`) and sets the output to `relu_result`!
+        let relu_result: remainder::mle::dense::DenseMle<F, F> = todo!();
 
         // **************************** BEGIN: output layer matmul + bias ****************************
         // --- Finally, compute the final matmul/bias layer, without ReLU ---
-        // let final_hidden_layer_vals_matrix = Matrix::new(
-        //     relu_result.mle_ref(),
-        //     1 as usize,
-        //     relu_result.mle_ref().bookkeeping_table().len(),
-        //     relu_result.get_prefix_bits(),
-        // );
+        let final_hidden_layer_vals_matrix = Matrix::new_with_padding(
+            relu_result.mle_ref(),
+            1 as usize,
+            relu_result.mle_ref().bookkeeping_table().len(),
+            relu_result.get_prefix_bits(),
+        );
 
-        // let out_linear_weight_bias = self.mlp_weights.out_linear_weight_bias.clone();
-        // let out_weights_matrix = Matrix::new(
-        //     out_linear_weight_bias.weights_mle.mle_ref(),
-        //     out_linear_weight_bias.dim.in_features,
-        //     out_linear_weight_bias.dim.out_features,
-        //     out_linear_weight_bias.weights_mle.get_prefix_bits(),
-        // );
+        let out_linear_weight_bias = self.mlp_weights.out_linear_weight_bias.clone();
+        let out_weights_matrix = Matrix::new(
+            out_linear_weight_bias.weights_mle.mle_ref(),
+            out_linear_weight_bias.dim.in_features,
+            out_linear_weight_bias.dim.out_features,
+            out_linear_weight_bias.weights_mle.get_prefix_bits(),
+        );
 
-        // let final_matmul_out =
-        //     layers.add_matmult_layer(final_hidden_layer_vals_matrix, out_weights_matrix);
+        let final_matmul_out =
+            layers.add_matmult_layer(final_hidden_layer_vals_matrix, out_weights_matrix);
 
-        // // --- Bias circuit ---
-        // let final_bias_builder =
-        //     BiasBuilder::new(final_matmul_out, out_linear_weight_bias.clone().biases_mle);
-        // let final_matmul_bias_out = layers.add_gkr(final_bias_builder);
+        // --- Bias circuit ---
+        let final_bias_builder =
+            BiasBuilder::new(final_matmul_out, out_linear_weight_bias.clone().biases_mle);
+        let final_matmul_bias_out = layers.add_gkr(final_bias_builder);
 
         // --- Output layers include bits are binary check, recomp check, and the final result ---
         let output_layers: Vec<remainder::mle::mle_enum::MleEnum<F>> = vec![
-            // bits_are_binary_result.get_enum(),
-            // recomp_checker_result.get_enum(),
-            // final_matmul_bias_out.mle_ref().get_enum(),
-            // relu_result.mle_ref().get_enum(),
-            // hidden_matmul_bias_out.mle_ref().get_enum(),
-            hidden_matmul_out.mle_ref().get_enum(),
-            // self.mlp_weights
-            //     .hidden_linear_weight_bias
-            //     .weights_mle
-            //     .mle_ref()
-            //     .get_enum(),
-            // self.mlp_input.input_mle.mle_ref().get_enum(),
+            bits_are_binary_result.get_enum(),
+            recomp_checker_result.get_enum(),
+            final_matmul_bias_out.mle_ref().get_enum(),
         ];
 
         Witness {
@@ -157,7 +132,7 @@ impl<F: FieldExt> GKRCircuit<F> for MLPCircuit<F> {
             input_layers: vec![
                 input_mles_input_layer.to_enum(),
                 parameter_mles_input_layer.to_enum(),
-                // hint_mles_input_layer.to_enum(),
+                hint_mles_input_layer.to_enum(),
             ],
         }
     }

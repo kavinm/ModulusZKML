@@ -5,36 +5,41 @@ use remainder::{
 };
 use remainder_shared_types::FieldExt;
 
+/// Builder which computes the ReLU(x) function using the original value
+/// `x` and the binary decomposition {b_0, ..., b_{30}, b_s} of `x`.
+///
+/// Recall that ReLU(x) = max(0, x)
 pub struct ReLUBuilder<F: FieldExt> {
     signed_bin_decomp_mle: DenseMle<F, BinDecomp32Bit<F>>,
-    pos_recomp: DenseMle<F, F>,
+    orig_mle: DenseMle<F, F>,
 }
 
+/// The LayerBuilder trait requires you to implement two functions:
+/// the build expression function and the next layer function
 impl<F: FieldExt> LayerBuilder<F> for ReLUBuilder<F> {
+    /// The `Self::Successor` type defines the output type of the `next_layer`
+    /// function, i.e. the type of MleRef which this layer computes from its
+    /// input MLEs.
     type Successor = DenseMle<F, F>;
 
-    /// (1 - b_s) * pos_recomp
+    /// The `build_expression` function returns an expression representing the
+    /// polynomial relationship between the input MLEs (i.e. those present
+    /// within the `struct ReLUBuilder`) and the output of the
+    /// `ReLUBuilder` circuit layer.
     fn build_expression(&self) -> ExpressionStandard<F> {
-        let signed_bit_mle_ref = self.signed_bin_decomp_mle.mle_bit_refs()
-            [self.signed_bin_decomp_mle.mle_bit_refs().len() - 1]
-            .clone();
-        ExpressionStandard::Mle(self.pos_recomp.mle_ref())
-            - ExpressionStandard::Product(vec![signed_bit_mle_ref, self.pos_recomp.mle_ref()])
+        todo!()
     }
 
+    /// The `next_layer` function performs the actual "computation" of the
+    /// circuit, i.e. using the values within `self.signed_bin_decomp_mle` and
+    /// `self.orig_mle`, it should output a `Self::Successor` whose values
+    /// represent ReLU(self.orig_mle).
     fn next_layer(
         &self,
         id: remainder::layer::LayerId,
         prefix_bits: Option<Vec<remainder::mle::MleIndex<F>>>,
     ) -> Self::Successor {
-        let result_iter = self.signed_bin_decomp_mle.mle_bit_refs()
-            [self.signed_bin_decomp_mle.mle_bit_refs().len() - 1]
-            .clone()
-            .bookkeeping_table
-            .into_iter()
-            .zip(self.pos_recomp.into_iter())
-            .map(|(signed_bit, mle)| (F::from(1) - signed_bit) * mle);
-        DenseMle::new_from_iter(result_iter, id, prefix_bits)
+        todo!()
     }
 }
 
@@ -42,11 +47,11 @@ impl<F: FieldExt> ReLUBuilder<F> {
     /// constructor for our bits are binary layer builder!
     pub fn new(
         signed_bin_decomp_mle: DenseMle<F, BinDecomp32Bit<F>>,
-        pos_recomp: DenseMle<F, F>,
+        orig_mle: DenseMle<F, F>,
     ) -> Self {
         Self {
             signed_bin_decomp_mle,
-            pos_recomp,
+            orig_mle,
         }
     }
 }

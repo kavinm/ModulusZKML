@@ -1,4 +1,4 @@
-use ark_std::test_rng;
+use ark_std::{log2, test_rng};
 use itertools::Itertools;
 use rand::Rng;
 use remainder::{
@@ -21,12 +21,12 @@ pub fn load_dummy_mlp_input_and_weights<F: FieldExt>(
     output_dim: usize,
 ) -> (MLPWeights<F>, MLPInputData<F>) {
     // --- Generate random inputs (8-bit) ---
-    let input_mle = gen_random_mle(input_dim, 4);
+    let input_mle = get_random_matrix_mle(1, input_dim, 8);
 
     // --- Generate random weights/biases for both layers ---
     let hidden_linear_weight_bias: NNLinearWeights<F> = NNLinearWeights {
-        weights_mle: gen_random_mle(input_dim * hidden_dim, 4),
-        biases_mle: gen_random_mle(hidden_dim, 4),
+        weights_mle: get_random_matrix_mle(input_dim, hidden_dim, 8),
+        biases_mle: gen_random_mle(hidden_dim, 8),
         dim: NNLinearDimension {
             in_features: input_dim,
             out_features: hidden_dim,
@@ -34,8 +34,8 @@ pub fn load_dummy_mlp_input_and_weights<F: FieldExt>(
     };
 
     let out_linear_weight_bias: NNLinearWeights<F> = NNLinearWeights {
-        weights_mle: gen_random_mle(hidden_dim * output_dim, 4),
-        biases_mle: gen_random_mle(output_dim, 4),
+        weights_mle: get_random_matrix_mle(hidden_dim, output_dim, 8),
+        biases_mle: gen_random_mle(output_dim, 8),
         dim: NNLinearDimension {
             in_features: hidden_dim,
             out_features: output_dim,
@@ -81,8 +81,6 @@ pub fn compute_hidden_layer_bin_decomp<F: FieldExt>(
     );
     let affine_out_first_layer = product_two_matrices(input_matrix, weights_matrix);
 
-    // println!("affine_out: {:?}", affine_out);
-
     // --- x^T A + b ---
     let linear_out_first_layer = affine_out_first_layer
         .into_iter()
@@ -90,27 +88,19 @@ pub fn compute_hidden_layer_bin_decomp<F: FieldExt>(
         .map(|(x, bias)| x + bias)
         .collect_vec();
 
-    // println!("linear_out: {:?}", linear_out);
-
     // --- Compute 32-bit bin decomp of `linear_out`, as required for ReLU in circuit ---
     let relu_decomp: Vec<BinDecomp32Bit<F>> = linear_out_first_layer
         .iter()
         .map(|x| {
-            // println!("x: {:?}", x.get_lower_128());
             let mut field_elem_i64_repr = x.get_lower_128() as i64;
             if *x > F::from(1 << 63) {
-                // println!("x: {:?}", x.get_lower_128());
                 assert!(x.neg().get_lower_128() < (1 << 63));
                 field_elem_i64_repr = -1 * (x.neg().get_lower_128() as i64);
-                // maybe assert
             }
-            // println!("field_elem_i64_repr: {:?}", field_elem_i64_repr);
             let decomp = build_signed_bit_decomposition(field_elem_i64_repr, 32).unwrap();
             BinDecomp32Bit::<F>::from(decomp)
         })
         .collect_vec();
-
-    // println!("relu_decomp: {:?}", relu_decomp);
 
     let relu_decomp_mle =
         DenseMle::new_from_iter(relu_decomp.clone().into_iter(), LayerId::Input(0), None);
@@ -129,18 +119,56 @@ pub fn compute_hidden_layer_bin_decomp<F: FieldExt>(
 pub fn gen_random_mle<F: FieldExt>(length: usize, total_bitwidth: u32) -> DenseMle<F, F> {
     assert_ne!(total_bitwidth, 0);
     let mut rng = test_rng();
-    // --- Generate random inputs ---
     let input_vec = (0..length).into_iter().map(|_| {
         let pos_in = F::from(rng.gen_range(0..=2_u64.pow(total_bitwidth - 1)));
-        return pos_in;
-        // if rng.gen_bool(0.5) {
-        //     return pos_in;
-        // } else {
-        //     return pos_in.neg();
-        // }
+        if rng.gen_bool(0.5) {
+            return pos_in;
+        } else {
+            return pos_in.neg();
+        }
     });
 
     DenseMle::new_from_iter(input_vec, LayerId::Input(0), None)
+}
+
+/// Necessary to add interleaved zero-padding to a "matrix"-style MLE, for
+/// claim correctness reasons
+pub fn get_random_matrix_mle<F: FieldExt>(
+    num_rows: usize,
+    num_cols: usize,
+    total_bitwidth: u32,
+) -> DenseMle<F, F> {
+    assert_ne!(total_bitwidth, 0);
+
+    // --- Need to pad columns first to the nearest power of two ---
+    let padded_num_cols = 1 << log2(num_cols);
+    let padded_num_rows = 1 << log2(num_rows);
+    let mut rng = test_rng();
+
+    let vals = (0..padded_num_rows)
+        .flat_map(|row_idx| {
+            if row_idx < num_rows {
+                return (0..padded_num_cols)
+                    .map(|col_idx| {
+                        if col_idx < num_cols {
+                            let pos_in = F::from(rng.gen_range(0..=2_u64.pow(total_bitwidth - 1)));
+                            if rng.gen_bool(0.5) {
+                                return pos_in;
+                            } else {
+                                return pos_in.neg();
+                            }
+                        }
+                        return F::zero();
+                    })
+                    .collect_vec();
+            }
+            return vec![F::zero(); padded_num_cols];
+        })
+        .collect_vec();
+
+    assert_eq!(vals.len(), padded_num_rows * padded_num_cols);
+
+    DenseMle::new_from_raw(vals, LayerId::Input(0), None)
 }
 
 /// Return the `bit_length` bit signed decomposition of the specified i64, or None if the argument is too large.

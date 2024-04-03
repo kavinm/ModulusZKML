@@ -14,11 +14,11 @@ use remainder_shared_types::{
     FieldExt,
 };
 
-use super::workshop_dims::{MLPInputData, MLPWeights};
+use super::soln_workshop_dims::{MLPInputData, MLPWeights};
 use super::{
-    bias_builder::BiasBuilder, bits_are_binary_builder::BitsAreBinaryBuilder,
-    circuit_builders::BinaryRecompCheckerBuilder, partial_recomp_builder::BinaryRecompBuilder32Bit,
-    relu_builder::ReLUBuilder,
+    soln_bias_builder::BiasBuilder, soln_bits_are_binary_builder::BitsAreBinaryBuilder,
+    soln_circuit_builders::BinaryRecompCheckerBuilder,
+    soln_partial_recomp_builder::BinaryRecompBuilder32Bit, soln_relu_builder::ReLUBuilder,
 };
 
 pub struct MLPCircuit<F: FieldExt> {
@@ -89,13 +89,15 @@ impl<F: FieldExt> GKRCircuit<F> for MLPCircuit<F> {
         let recomp_checker_result = layers.add_gkr(recomp_checker_builder);
 
         // --- Finally, the actual ReLU circuit ---
-        let relu_builder =
-            ReLUBuilder::new(self.mlp_input.relu_bin_decomp.clone(), pos_bin_recomp_mle);
+        let relu_builder = ReLUBuilder::new(
+            self.mlp_input.relu_bin_decomp.clone(),
+            hidden_matmul_bias_out,
+        );
         let relu_result = layers.add_gkr(relu_builder);
 
         // **************************** BEGIN: output layer matmul + bias ****************************
         // --- Finally, compute the final matmul/bias layer, without ReLU ---
-        let final_hidden_layer_vals_matrix = Matrix::new(
+        let final_hidden_layer_vals_matrix = Matrix::new_with_padding(
             relu_result.mle_ref(),
             1 as usize,
             relu_result.mle_ref().bookkeeping_table().len(),
@@ -215,7 +217,7 @@ impl<F: FieldExt> MLPCircuit<F> {
 // #[ignore]
 #[test]
 fn test_full_circuit() {
-    use super::workshop_utils::load_dummy_mlp_input_and_weights;
+    use super::soln_workshop_utils::load_dummy_mlp_input_and_weights;
     use remainder_shared_types::Fr;
 
     let (mnist_weights, mnist_inputs) = load_dummy_mlp_input_and_weights::<Fr>(16, 4, 4);

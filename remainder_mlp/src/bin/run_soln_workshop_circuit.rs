@@ -2,8 +2,8 @@
 
 use ark_serialize::Read;
 use clap::Parser;
-use remainder_mlp::soln_workshop_exercise_circuit::nn_full_circuit::MLPCircuit;
-use remainder_mlp::soln_workshop_exercise_circuit::workshop_utils::load_dummy_mlp_input_and_weights;
+use remainder_mlp::soln_workshop_exercise_circuit::soln_nn_full_circuit::MLPCircuit;
+use remainder_mlp::soln_workshop_exercise_circuit::soln_workshop_utils::load_dummy_mlp_input_and_weights;
 
 use remainder::prover::{GKRCircuit, GKRError, GKRProof};
 

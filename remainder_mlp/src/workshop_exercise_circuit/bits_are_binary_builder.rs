@@ -8,20 +8,24 @@ use remainder::{
 };
 use remainder_shared_types::FieldExt;
 
+/// Builder which should take in an MLE of purported binary decompositions
+/// and ensure that all the contents of the MLE are actually in {0, 1}.
 pub struct BitsAreBinaryBuilder<F: FieldExt> {
-    signed_bin_decomp_mle: DenseMle<F, BinDecomp32Bit<F>>,
+    bits_mle: DenseMle<F, BinDecomp32Bit<F>>,
 }
 
 impl<F: FieldExt> LayerBuilder<F> for BitsAreBinaryBuilder<F> {
+    /// The `Self::Successor` type defines the output type of the `next_layer`
+    /// function, i.e. the type of MleRef which this layer computes from its
+    /// input MLEs. In this case, the check *should* result in all zeros!
     type Successor = ZeroMleRef<F>;
 
+    /// The `build_expression` function returns an expression representing the
+    /// polynomial relationship between the input MLEs (i.e. those present
+    /// within the `struct BitsAreBinaryBuilder`) and the output of the
+    /// `BitsAreBinaryBuilder` circuit layer.
     fn build_expression(&self) -> ExpressionStandard<F> {
-        let signed_bit_mle_ref = self.signed_bin_decomp_mle.get_entire_mle_as_mle_ref();
-        ExpressionStandard::Mle(signed_bit_mle_ref.clone())
-            - ExpressionStandard::Product(vec![
-                signed_bit_mle_ref.clone(),
-                signed_bit_mle_ref.clone(),
-            ])
+        todo!()
     }
 
     fn next_layer(
@@ -29,19 +33,13 @@ impl<F: FieldExt> LayerBuilder<F> for BitsAreBinaryBuilder<F> {
         id: remainder::layer::LayerId,
         prefix_bits: Option<Vec<remainder::mle::MleIndex<F>>>,
     ) -> Self::Successor {
-        ZeroMleRef::new(
-            self.signed_bin_decomp_mle.num_iterated_vars(),
-            prefix_bits,
-            id,
-        )
+        todo!()
     }
 }
 
 impl<F: FieldExt> BitsAreBinaryBuilder<F> {
     /// constructor for our bits are binary layer builder!
-    pub fn new(signed_bin_decomp_mle: DenseMle<F, BinDecomp32Bit<F>>) -> Self {
-        Self {
-            signed_bin_decomp_mle,
-        }
+    pub fn new(bits_mle: DenseMle<F, BinDecomp32Bit<F>>) -> Self {
+        Self { bits_mle }
     }
 }

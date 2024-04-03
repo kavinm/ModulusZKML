@@ -41,7 +41,23 @@ pub struct Matrix<F: FieldExt> {
 }
 
 impl<F: FieldExt> Matrix<F> {
+    /// For weight matrices
     pub fn new(
+        mle_ref: DenseMleRef<F>,
+        num_rows: usize,
+        num_cols: usize,
+        prefix_bits: Option<Vec<MleIndex<F>>>,
+    ) -> Matrix<F> {
+        Matrix {
+            mle_ref,
+            num_rows_vars: log2(num_rows) as usize,
+            num_cols_vars: log2(num_cols) as usize,
+            prefix_bits,
+        }
+    }
+
+    /// For circuit intermediates
+    pub fn new_with_padding(
         mut mle_ref: DenseMleRef<F>,
         num_rows: usize,
         num_cols: usize,
@@ -74,9 +90,6 @@ impl<F: FieldExt> Matrix<F> {
         }
 
         assert_eq!(padded_matrix_len, mle_ref.bookkeeping_table.len());
-
-        // --- Also set the mle_ref's original bookkeeping table just in case ---
-        mle_ref.original_bookkeeping_table = mle_ref.bookkeeping_table.clone();
 
         Matrix {
             mle_ref,
