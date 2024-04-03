@@ -16,7 +16,7 @@ impl<F: FieldExt> LayerBuilder<F> for BiasBuilder<F> {
     }
 
     fn next_layer(&self, id: remainder::layer::LayerId, prefix_bits: Option<Vec<remainder::mle::MleIndex<F>>>) -> Self::Successor {
-        let result_bookkeeping_table = self.data_mle.into_iter().zip(self.bias_mle.into_iter()).map(|(data, bias)| {
+        let result_bookkeeping_table = self.data_mle.into_iter().zip(self.bias_mle.into_iter().cycle()).map(|(data, bias)| {
             data + bias
         });
         DenseMle::new_from_iter(result_bookkeeping_table, id, prefix_bits)

@@ -75,6 +75,9 @@ pub fn compute_batched_hidden_layer_values_and_bin_decomps<F: FieldExt>(
 
             let combined_last_layer_output = DenseMle::<F, F>::combine_mle_batch(last_layer_output.clone());
 
+            println!("combined_last_layer_output len {:?}", combined_last_layer_output.mle.len());
+            println!("weights_mle len {:?}", weights_mle.mle.len());
+
             // --- Construct matrices for x^T A ---
             let input_matrix = Matrix::new(
                 combined_last_layer_output.mle_ref(),
@@ -90,12 +93,15 @@ pub fn compute_batched_hidden_layer_values_and_bin_decomps<F: FieldExt>(
             );
             let affine_out = product_two_matrices(input_matrix, weights_matrix);
 
-            let affine_out_vec = affine_out.chunks(batch_size)
+            let affine_out_vec = affine_out.chunks(1 << log2(dim.out_features))
                 .map(|chunk| chunk.to_vec())
                 .collect_vec();
 
+            println!("folded");
+            println!("affine_out len {:?}", affine_out.len());
+
             assert_eq!(affine_out_vec.len(), batch_size);
-            assert_eq!(affine_out_vec[0].len(), dim.out_features);
+            assert_eq!(affine_out_vec[0].len(), 1 << log2(dim.out_features));
 
             // println!("affine_out: {:?}", affine_out);
 
@@ -111,6 +117,7 @@ pub fn compute_batched_hidden_layer_values_and_bin_decomps<F: FieldExt>(
                 }).collect_vec();
 
             // println!("linear_out: {:?}", linear_out);
+            assert_eq!(linear_out_vec.len(), batch_size);
 
             let (mut relu_decomp_mle_vec, mut next_hidden_layer_vals_mle_vec) = (vec![], vec![]);
             

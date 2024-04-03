@@ -12,7 +12,7 @@ use rayon::{prelude::ParallelIterator, slice::ParallelSlice};
 use serde::{Deserialize, Serialize};
 
 use super::{mle_enum::MleEnum, Mle, MleAble, MleIndex, MleRef};
-use crate::{expression::ExpressionStandard, layer::{claims::Claim, combine_mle_refs::combine_mle_refs}};
+use crate::{expression::ExpressionStandard, layer::{batched, claims::Claim, combine_mle_refs::combine_mle_refs}};
 use crate::{
     layer::{batched::combine_mles, LayerId},
 };
@@ -96,6 +96,21 @@ impl<F: FieldExt, T: Send + Sync + Clone + Debug + MleAble<F>> DenseMle<F, T> {
             prefix_bits,
             _marker: PhantomData,
         }
+    }
+
+    pub fn batch_dense_mle(
+        mles: Vec<DenseMle<F, T>>,
+    ) -> DenseMle<F, T> {
+
+        let layer_id = mles[0].layer_id;
+        let prefix_bits = mles[0].clone().prefix_bits;
+        let mle_flattened = mles.iter().map(|mle| mle.into_iter()).flatten();
+
+        Self::new_from_iter(
+            mle_flattened,
+            layer_id,
+            prefix_bits,
+        )
     }
 }
 
