@@ -1,10 +1,25 @@
+// Copyright © 2024.  Modulus Labs, Inc.
+
+// Restricted Use License
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the ìSoftwareî), to use the Software internally for evaluation, non-production purposes only.  Any redistribution, reproduction, modification, sublicensing, publication, or other use of the Software is strictly prohibited.  In addition, usage of the Software is subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED ìAS ISî, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+use crate::{
+    gate::gate::BinaryOperation,
+    layer::simple_builders::{EqualityCheck, ZeroBuilder},
+    mle::mle_enum::MleEnum,
+    prover::helpers::test_circuit,
+};
 use ark_std::{end_timer, log2, start_timer, test_rng, One};
 use itertools::{repeat_n, Itertools};
 use rand::Rng;
 use remainder_ligero::ligero_commit::remainder_ligero_commit_prove;
 use serde_json::{from_reader, to_writer};
 use tracing::Level;
-use crate::{gate::gate::BinaryOperation, layer::simple_builders::{EqualityCheck, ZeroBuilder}, mle::mle_enum::MleEnum, prover::helpers::test_circuit};
 
 use std::{cmp::max, fs, iter::repeat_with, path::Path, time::Instant};
 
@@ -91,7 +106,8 @@ impl<F: FieldExt> GKRCircuit<F> for SimpleCircuit<F> {
 
         // --- The input layer should just be the concatenation of `mle` and `output_input` ---
         // The input layer is ready at this point!
-        let input_layer: LigeroInputLayer<F, Self::Transcript> = input_layer.to_input_layer_with_rho_inv(4, 1.);
+        let input_layer: LigeroInputLayer<F, Self::Transcript> =
+            input_layer.to_input_layer_with_rho_inv(4, 1.);
         let input_layers = vec![input_layer.to_enum()];
 
         // --- Subtract the computed circuit output from the advice circuit output ---
@@ -165,7 +181,8 @@ impl<F: FieldExt> GKRCircuit<F> for SimplestCircuit<F> {
         let first_layer_output = layers.add_gkr(diff_builder);
 
         // --- The input layer should just be the concatenation of `mle` and `output_input` ---
-        let input_layer: LigeroInputLayer<F, Self::Transcript> = input_layer.to_input_layer_with_rho_inv(4, 1.);
+        let input_layer: LigeroInputLayer<F, Self::Transcript> =
+            input_layer.to_input_layer_with_rho_inv(4, 1.);
 
         Witness {
             layers,
@@ -273,7 +290,7 @@ impl<F: FieldExt> GKRCircuit<F> for RandomCircuit<F> {
         &mut self,
         transcript: &mut Self::Transcript,
     ) -> Result<(Witness<F, Self::Transcript>, Vec<CommitmentEnum<F>>), GKRError> {
-        let input_layer:  LigeroInputLayer<F, _> =
+        let input_layer: LigeroInputLayer<F, _> =
             InputLayerBuilder::new(vec![Box::new(&mut self.mle)], None, LayerId::Input(0))
                 .to_input_layer_with_rho_inv(4, 1.);
         let mut input = input_layer.to_enum();
@@ -657,8 +674,13 @@ impl<F: FieldExt> GKRCircuit<F> for SimplestGateCircuit<F> {
             nonzero_gates.push((idx, idx, idx));
         });
 
-        let first_layer_output =
-            layers.add_gate(nonzero_gates, self.mle.mle_ref(), self.negmle.mle_ref(), None, BinaryOperation::Add);
+        let first_layer_output = layers.add_gate(
+            nonzero_gates,
+            self.mle.mle_ref(),
+            self.negmle.mle_ref(),
+            None,
+            BinaryOperation::Add,
+        );
 
         let output_layer_builder = ZeroBuilder::new(first_layer_output);
 
@@ -691,14 +713,20 @@ impl<F: FieldExt> GKRCircuit<F> for SimplestGateCircuitUneven<F> {
         // --- Create Layers to be added to ---
         let mut layers = Layers::new();
 
-        let mut nonzero_gates = vec![(0,0,0)];
+        let mut nonzero_gates = vec![(0, 0, 0)];
 
-        let first_layer_output =
-            layers.add_gate(nonzero_gates, self.mle.mle_ref(), self.negmle.mle_ref(), None, BinaryOperation::Add);
+        let first_layer_output = layers.add_gate(
+            nonzero_gates,
+            self.mle.mle_ref(),
+            self.negmle.mle_ref(),
+            None,
+            BinaryOperation::Add,
+        );
 
         let output_layer_builder = ZeroBuilder::new(first_layer_output);
 
-        let output_layer_mle = layers.add::<_, EmptyLayer<F, Self::Transcript>>(output_layer_builder);
+        let output_layer_mle =
+            layers.add::<_, EmptyLayer<F, Self::Transcript>>(output_layer_builder);
 
         Witness {
             layers,
@@ -742,7 +770,7 @@ impl<F: FieldExt> GKRCircuit<F> for MulAddSimplestGateCircuit<F> {
             nonzero_gates.clone(),
             self.mle_1.mle_ref(),
             self.mle_2.mle_ref(),
-            None, 
+            None,
             BinaryOperation::Mul,
         );
 
@@ -750,7 +778,7 @@ impl<F: FieldExt> GKRCircuit<F> for MulAddSimplestGateCircuit<F> {
             nonzero_gates.clone(),
             self.mle_1.mle_ref(),
             self.neg_mle_2.mle_ref(),
-            None, 
+            None,
             BinaryOperation::Mul,
         );
 
@@ -868,8 +896,13 @@ impl<F: FieldExt> GKRCircuit<F> for SimplestGateCircuitCombined<F> {
             nonzero_gates.push((idx, idx, idx));
         });
 
-        let first_layer_output =
-            layers.add_gate(nonzero_gates, self.mle.mle_ref(), self.negmle.mle_ref(), None, BinaryOperation::Add);
+        let first_layer_output = layers.add_gate(
+            nonzero_gates,
+            self.mle.mle_ref(),
+            self.negmle.mle_ref(),
+            None,
+            BinaryOperation::Add,
+        );
 
         let output_layer_builder = ZeroBuilder::new(first_layer_output);
 
@@ -1292,7 +1325,10 @@ fn test_gkr_circuit_with_precommit() {
 
     let circuit: SimplePrecommitCircuit<Fr> = SimplePrecommitCircuit { mle, mle2 };
 
-    test_circuit(circuit, Some(Path::new("./gkr_proof_with_precommit_optimized.json")));
+    test_circuit(
+        circuit,
+        Some(Path::new("./gkr_proof_with_precommit_optimized.json")),
+    );
 }
 
 // ------------------------------------ INPUT LAYER TESTING CIRCUITS ------------------------------------
@@ -1458,7 +1494,10 @@ fn test_gkr_gate_batched_simplest_circuit() {
         batch_bits: 2,
     };
 
-    test_circuit(circuit, Some(Path::new("./gate_batch_proof2_optimized.json")));
+    test_circuit(
+        circuit,
+        Some(Path::new("./gate_batch_proof2_optimized.json")),
+    );
 }
 
 #[test]
@@ -1494,9 +1533,11 @@ fn test_gkr_gate_batched_simplest_circuit_uneven() {
         batch_bits: 2,
     };
 
-    test_circuit(circuit, Some(Path::new("./gate_batch_proof_uneven_optimized.json")));
+    test_circuit(
+        circuit,
+        Some(Path::new("./gate_batch_proof_uneven_optimized.json")),
+    );
 }
-
 
 #[test]
 fn test_gkr_add_mul_gate_batched_simplest_circuit() {
@@ -1549,7 +1590,10 @@ fn test_gkr_add_mul_gate_batched_simplest_circuit() {
         batch_bits: 1,
     };
 
-    test_circuit(circuit, Some(Path::new("./gate_batch_proof1_optimized.json")));
+    test_circuit(
+        circuit,
+        Some(Path::new("./gate_batch_proof1_optimized.json")),
+    );
 
     // panic!();
 }
@@ -1580,14 +1624,17 @@ fn test_gkr_add_mul_gate_simplest_circuit() {
         LayerId::Input(0),
         None,
     );
-    
+
     let circuit: MulAddSimplestGateCircuit<Fr> = MulAddSimplestGateCircuit {
         mle_1,
         mle_2,
         neg_mle_2,
     };
 
-    test_circuit(circuit, Some(Path::new("./mul_gate_simple_proof_optimized.json")));
+    test_circuit(
+        circuit,
+        Some(Path::new("./mul_gate_simple_proof_optimized.json")),
+    );
 
     // panic!();
 }
@@ -1895,8 +1942,7 @@ impl<F: FieldExt> GKRCircuit<F> for SimpleNonZeroOutputCircuit<F> {
     fn synthesize(&mut self) -> Witness<F, Self::Transcript> {
         // --- The input layer should just be the concatenation of `mle` and `output_input` ---
         let input_mles: Vec<Box<&mut dyn Mle<F>>> = vec![Box::new(&mut self.mle)];
-        let mut input_layer =
-            InputLayerBuilder::new(input_mles, None, LayerId::Input(0));
+        let mut input_layer = InputLayerBuilder::new(input_mles, None, LayerId::Input(0));
         let mle_clone = &self.mle;
 
         // --- Create Layers to be added to ---
@@ -1922,7 +1968,8 @@ impl<F: FieldExt> GKRCircuit<F> for SimpleNonZeroOutputCircuit<F> {
         // --- Then adds them to the overall circuit ---
         let first_layer_output = layers.add_gkr(mult_builder);
 
-        let input_layer: LigeroInputLayer<F, Self::Transcript> = input_layer.to_input_layer_with_rho_inv(4, 1.);
+        let input_layer: LigeroInputLayer<F, Self::Transcript> =
+            input_layer.to_input_layer_with_rho_inv(4, 1.);
         let input_layers = vec![input_layer.to_enum()];
 
         Witness {
@@ -1950,5 +1997,8 @@ fn test_gkr_simple_non_zero_circuit() {
     );
 
     let circuit: SimpleNonZeroOutputCircuit<Fr> = SimpleNonZeroOutputCircuit { mle, size };
-    test_circuit(circuit, Some(Path::new("simple_non_zero_circuit_optimized.json")));
+    test_circuit(
+        circuit,
+        Some(Path::new("simple_non_zero_circuit_optimized.json")),
+    );
 }

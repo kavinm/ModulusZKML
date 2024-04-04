@@ -1,3 +1,13 @@
+// Copyright © 2024.  Modulus Labs, Inc.
+
+// Restricted Use License
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the ìSoftwareî), to use the Software internally for evaluation, non-production purposes only.  Any redistribution, reproduction, modification, sublicensing, publication, or other use of the Software is strictly prohibited.  In addition, usage of the Software is subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED ìAS ISî, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
 //! Contains cryptographic algorithms for going through the sumcheck protocol
 
 use std::{
@@ -15,7 +25,11 @@ use thiserror::Error;
 
 use crate::{
     expression::{Expression, ExpressionError, ExpressionStandard},
-    mle::{beta::BetaTable, dense::{DenseMleRef, DenseMle}, MleIndex, MleRef},
+    mle::{
+        beta::BetaTable,
+        dense::{DenseMle, DenseMleRef},
+        MleIndex, MleRef,
+    },
 };
 use remainder_shared_types::FieldExt;
 
@@ -115,30 +129,30 @@ impl<F: FieldExt> Mul<&F> for Evals<F> {
 /// value (e.g. if all variables are bound and/or the expression is just over
 /// a constant), or a vector of evals at 0, ..., deg - 1 for an expression
 /// where there are iterated variables.
-/// 
+///
 /// Binary mult tree
 /// []
 /// [] [] []
 /// [] []
 /// []
 /// V_i(b_1, ..., b_n) = V_{i + 1}(0, b_1, ..., b_n) + V_{i + 1}(1, b_1, ..., b_n)
-/// \tilde{V_i}(g_1, ..., g_n) = \sum_{b_1, ..., b_n} \beta(g, b) * 
+/// \tilde{V_i}(g_1, ..., g_n) = \sum_{b_1, ..., b_n} \beta(g, b) *
 ///     (\tilde{V_{i + 1}}(0, b_1, ..., b_n) + \tilde{V_{i + 1}}(1, b_1, ..., b_n))
 ///
 /// \tilde{V_i}(g_1, ..., g_n) = c_1
-/// P -> g_1(x) = \sum_{b_2, ..., b_n} \beta(g, x, b2, ..., b_n) * 
+/// P -> g_1(x) = \sum_{b_2, ..., b_n} \beta(g, x, b2, ..., b_n) *
 ///     (\tilde{V_{i + 1}}(0, x, b_2, ..., b_n) + \tilde{V_{i + 1}}(1, x, b_2, ..., b_n)) + 3
-/// 
-/// \sum_{b_2, ..., b_n} \beta(g, x, b2, ..., b_n) * \tilde{V_{i + 1}}(0, x, ..., b_n) + 
-/// \sum_{b_2, ..., b_n} \beta(g, x, b2, ..., b_n) * \tilde{V_{i + 1}}(1, x, ..., b_n) * \tilde{V_{i + 1}}(1, x, ..., b_n)+ 
+///
+/// \sum_{b_2, ..., b_n} \beta(g, x, b2, ..., b_n) * \tilde{V_{i + 1}}(0, x, ..., b_n) +
+/// \sum_{b_2, ..., b_n} \beta(g, x, b2, ..., b_n) * \tilde{V_{i + 1}}(1, x, ..., b_n) * \tilde{V_{i + 1}}(1, x, ..., b_n)+
 /// \sum_{b_2, ..., b_n} \beta(g, x, b2, ..., b_n) * 3
-/// 
+///
 /// beta_table = \beta(g, b_1, b_2, ..., b_n)
-/// 
-/// g_1(x) = g_{11}(x) = /// \sum_{b_2, ..., b_n} \beta(g, x, b2, ..., b_n) * \tilde{V_{i + 1}}(0, x, ..., b_n) + 
-/// + g_{12}(x) =  \sum_{b_2, ..., b_n} \beta(g, x, b2, ..., b_n) * \tilde{V_{i + 1}}(1, x, ..., b_n) * \tilde{V_{i + 1}}(1, x, ..., b_n)+ 
+///
+/// g_1(x) = g_{11}(x) = /// \sum_{b_2, ..., b_n} \beta(g, x, b2, ..., b_n) * \tilde{V_{i + 1}}(0, x, ..., b_n) +
+/// + g_{12}(x) =  \sum_{b_2, ..., b_n} \beta(g, x, b2, ..., b_n) * \tilde{V_{i + 1}}(1, x, ..., b_n) * \tilde{V_{i + 1}}(1, x, ..., b_n)+
 /// + g_{13}(x) = /// \sum_{b_2, ..., b_n} \beta(g, x, b2, ..., b_n) * 3
-/// 
+///
 /// g_1(0) + g_1(1) = c_1
 /// # Arguments
 /// * `expr` - The actual expression to evaluate
@@ -159,7 +173,6 @@ pub(crate) fn compute_sumcheck_message<
     max_degree: usize,
     beta_table: &BetaTable<F>,
 ) -> Result<Evals<F>, ExpressionError> {
-
     // --- TODO!(ende): REMEMBER TO REMOVE ALL THE PRINTLN STATEMENTS ---
 
     // --- TODO!(ryancao): (From Zhenfei): So we can probably cache this beta table evaluation somehow
@@ -186,7 +199,7 @@ pub(crate) fn compute_sumcheck_message<
         Ok(beta_eval * constant)
     };
 
-    // V_i(b_1, ..., b_n) = ((1 - b1) * (V_{i + 1}(0, 0, b2, ..., bn) + V_{i + 1}(0, 0, b2, ..., bn))) + 
+    // V_i(b_1, ..., b_n) = ((1 - b1) * (V_{i + 1}(0, 0, b2, ..., bn) + V_{i + 1}(0, 0, b2, ..., bn))) +
     // b1 * (V_{i + 1}(0, 0, b2, ..., bn) * V_{i + 1}(0, 0, b2, ..., bn)))
     let selector = |index: &MleIndex<F>, a, b| match index {
         MleIndex::IndexedBit(indexed_bit) => {
@@ -272,12 +285,13 @@ pub(crate) fn compute_sumcheck_message<
 
     // --- First see whether there are any iterated variables we should go over ---
     // --- Then just call the `evaluate_mle_ref_product` function ---
-    let product =
-        for<'a, 'b> |mle_refs: &'a [DenseMleRef<F>], beta_mle_ref: &'b DenseMleRef<F>| -> Result<Evals<F>, ExpressionError> {
-            // have to include the beta table and evaluate as a product
-            evaluate_mle_ref_product_with_beta(mle_refs, round_index, max_degree, beta_mle_ref.clone())
-                .map_err(ExpressionError::MleError)
-        };
+    let product = for<'a, 'b> |mle_refs: &'a [DenseMleRef<F>],
+                               beta_mle_ref: &'b DenseMleRef<F>|
+                 -> Result<Evals<F>, ExpressionError> {
+        // have to include the beta table and evaluate as a product
+        evaluate_mle_ref_product_with_beta(mle_refs, round_index, max_degree, beta_mle_ref.clone())
+            .map_err(ExpressionError::MleError)
+    };
 
     // --- Scalar is just distributed mult as defined earlier ---
     let scaled = |a, scalar| {
@@ -298,7 +312,6 @@ pub(crate) fn compute_sumcheck_message<
     )
 }
 
-
 /// evaluate mle refs when there's no independent variable, i.e.
 /// sum_{x_1, ..., x_n} V_1(x_1, ..., x_n) * V_2(x_1, ..., x_n),
 /// with x_1, ..., x_n over the boolean hypercube
@@ -306,7 +319,6 @@ pub(crate) fn compute_sumcheck_message<
 pub fn evaluate_mle_ref_product_no_inde_var<F: FieldExt>(
     mle_refs: &[impl MleRef<F = F>],
 ) -> Result<F, MleError> {
-
     // --- Gets the total number of iterated variables across all MLEs within this product ---
     let max_num_vars = mle_refs
         .iter()
@@ -366,10 +378,9 @@ pub fn evaluate_mle_ref_product_no_inde_var<F: FieldExt>(
     Ok(evals[0])
 }
 
-
 /// evaluates the product of multiple mle refs (in the evalutaion form),
 /// (the mles could be beta tables as well)
-/// the returned results can be the following expresssion: 
+/// the returned results can be the following expresssion:
 /// sum_{x_2, ..., x_n} V_1(X, x_2, ..., x_n) * V_2(X, x_2, ..., x_n) * V_2(X, x_2, x_3),
 /// evaluated at X = 0, 1, ..., degree
 /// note that when one of the mle_refs have less variables, there's a wrap around: % max
@@ -377,7 +388,6 @@ pub fn evaluate_mle_ref_product<F: FieldExt>(
     mle_refs: &[impl MleRef<F = F>],
     degree: usize,
 ) -> Result<Evals<F>, MleError> {
-
     // --- Gets the total number of iterated variables across all MLEs within this product ---
     let max_num_vars = mle_refs
         .iter()
@@ -446,7 +456,6 @@ pub fn evaluate_mle_ref_product<F: FieldExt>(
     Ok(Evals(evals))
 }
 
-
 /// @param mle_refs: The list of MLEs which are being multiplied together
 /// @param round_index: Which round of sumcheck it currently is
 /// @param degree: The degree of the indexed variable
@@ -485,36 +494,46 @@ pub fn evaluate_mle_ref_product_with_beta<F: FieldExt>(
         mle_refs.push(beta_ref);
         evaluate_mle_ref_product(&mle_refs, degree)
     } else {
-
         // say we have some expression like sum_{x_1, x_2} beta(x_0, x_1, x_2) \times V(x_1, x_2)^2
         //     (we assume there's only one extra variable in the beginning of beta mle,
         //     otherwise, we need to use beta split)
         // First,
         // we fix x_0 = 0, and want to get sum_{x_1, x_2} beta(0, x_1, x_2) \times V(x_1, x_2)^2
         let beta_first_half: DenseMleRef<F> = DenseMle::new_from_raw(
-            beta_ref.bookkeeping_table().iter().step_by(2).cloned().collect_vec(),
+            beta_ref
+                .bookkeeping_table()
+                .iter()
+                .step_by(2)
+                .cloned()
+                .collect_vec(),
             beta_ref.get_layer_id(),
             None,
-        ).mle_ref();
+        )
+        .mle_ref();
 
         let mut mle_ref_first_half = mle_refs.to_vec().clone();
         mle_ref_first_half.push(beta_first_half);
         let beta_at_0 = evaluate_mle_ref_product_no_inde_var(&mle_ref_first_half)?;
 
-
         // Then,
         // we do the same for the second half of the beta table, i.e. fixing x_0 = 1,
         // to get sum_{x_1, x_2} beta(1, x_1, x_2) \times V(x_1, x_2)^2
         let beta_second_half: DenseMleRef<F> = DenseMle::new_from_raw(
-            beta_ref.bookkeeping_table().iter().skip(1).step_by(2).cloned().collect_vec(),
+            beta_ref
+                .bookkeeping_table()
+                .iter()
+                .skip(1)
+                .step_by(2)
+                .cloned()
+                .collect_vec(),
             beta_ref.get_layer_id(),
             None,
-        ).mle_ref();
+        )
+        .mle_ref();
 
         let mut mle_ref_second_half = mle_refs.to_vec().clone();
         mle_ref_second_half.push(beta_second_half);
         let beta_at_1 = evaluate_mle_ref_product_no_inde_var(&mle_ref_second_half)?;
-
 
         // partials have two elements (beta is always linear)
         // 1. sum_{x_1, x_2} beta(x_0 = 0, x_1, x_2) \times V(x_1, x_2)^2
@@ -526,11 +545,18 @@ pub fn evaluate_mle_ref_product_with_beta<F: FieldExt>(
 
         let step: F = partials[1] - partials[0];
         let mut counter = 2;
-        let evals =
-        std::iter::once(partials[0]).chain(std::iter::successors(Some(partials[1]), move |item| if counter < eval_count {counter += 1; Some(*item + step)} else {None})).collect_vec();
+        let evals = std::iter::once(partials[0])
+            .chain(std::iter::successors(Some(partials[1]), move |item| {
+                if counter < eval_count {
+                    counter += 1;
+                    Some(*item + step)
+                } else {
+                    None
+                }
+            }))
+            .collect_vec();
 
         Ok(Evals(evals))
-
     }
 }
 
@@ -586,7 +612,9 @@ pub(crate) fn evaluate_at_a_point<F: FieldExt>(
                     .fold(
                         // Compute vector of (numerator, denominator)
                         (F::one(), F::one()),
-                        |(num, denom), val| (num * (point - val), denom * (F::from(x as u64) - val)),
+                        |(num, denom), val| {
+                            (num * (point - val), denom * (F::from(x as u64) - val))
+                        },
                     )
             },
         )

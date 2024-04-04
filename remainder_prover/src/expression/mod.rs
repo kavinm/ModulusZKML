@@ -1,3 +1,13 @@
+// Copyright © 2024.  Modulus Labs, Inc.
+
+// Restricted Use License
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the ìSoftwareî), to use the Software internally for evaluation, non-production purposes only.  Any redistribution, reproduction, modification, sublicensing, publication, or other use of the Software is strictly prohibited.  In addition, usage of the Software is subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED ìAS ISî, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
 //! An expression is a type which allows for expressing the definition of a GKR layer
 
 use std::{
@@ -704,19 +714,31 @@ impl<F: std::fmt::Debug + FieldExt> ExpressionStandard<F> {
                     ExpressionStandard::Constant(scalar) => {
                         f.debug_tuple("const").field(scalar).finish()
                     }
-                    ExpressionStandard::Selector(index, a, b) => f.write_fmt(format_args!("sel {index:?}; {}; {}", CircuitDesc(a), CircuitDesc(b))),
+                    ExpressionStandard::Selector(index, a, b) => f.write_fmt(format_args!(
+                        "sel {index:?}; {}; {}",
+                        CircuitDesc(a),
+                        CircuitDesc(b)
+                    )),
                     // Skip enum variant and print query struct directly to maintain backwards compatibility.
-                    ExpressionStandard::Mle(mle_ref) => {
-                        f.debug_struct("mle").field("layer", &mle_ref.get_layer_id()).field("indices", &mle_ref.mle_indices()).finish()
+                    ExpressionStandard::Mle(mle_ref) => f
+                        .debug_struct("mle")
+                        .field("layer", &mle_ref.get_layer_id())
+                        .field("indices", &mle_ref.mle_indices())
+                        .finish(),
+                    ExpressionStandard::Negated(poly) => {
+                        f.write_fmt(format_args!("-{}", CircuitDesc(poly)))
                     }
-                    ExpressionStandard::Negated(poly) => f.write_fmt(format_args!("-{}", CircuitDesc(poly))),
-                    ExpressionStandard::Sum(a, b) => f.write_fmt(format_args!("+ {}; {}", CircuitDesc(a), CircuitDesc(b))),
+                    ExpressionStandard::Sum(a, b) => {
+                        f.write_fmt(format_args!("+ {}; {}", CircuitDesc(a), CircuitDesc(b)))
+                    }
                     ExpressionStandard::Product(a) => {
-                        let str = a.iter().map(|mle| {
-                            format!("{:?}; {:?}", mle.get_layer_id(), mle.mle_indices())
-                        }).reduce(|acc, str| acc + &str).unwrap();
+                        let str = a
+                            .iter()
+                            .map(|mle| format!("{:?}; {:?}", mle.get_layer_id(), mle.mle_indices()))
+                            .reduce(|acc, str| acc + &str)
+                            .unwrap();
                         f.write_str(&str)
-                    },
+                    }
                     ExpressionStandard::Scaled(poly, scalar) => {
                         f.write_fmt(format_args!("* {}; {:?}", CircuitDesc(poly), scalar))
                     }

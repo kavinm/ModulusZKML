@@ -1,8 +1,18 @@
+// Copyright © 2024.  Modulus Labs, Inc.
+
+// Restricted Use License
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the ìSoftwareî), to use the Software internally for evaluation, non-production purposes only.  Any redistribution, reproduction, modification, sublicensing, publication, or other use of the Software is strictly prohibited.  In addition, usage of the Software is subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED ìAS ISî, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
 use ark_std::cfg_into_iter;
 use itertools::Itertools;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 
-use std::{fmt::Debug, cmp::max};
+use std::{cmp::max, fmt::Debug};
 
 use crate::{mle::beta::BetaTable, sumcheck::*};
 use remainder_shared_types::FieldExt;
@@ -55,9 +65,7 @@ fn evaluate_mle_ref_product_no_beta_table<F: FieldExt>(
     // --- Gets the total number of iterated variables across all MLEs within this product ---
     let max_num_vars = mle_refs
         .iter()
-        .map(|mle_ref| {
-            mle_ref.num_vars()
-        })
+        .map(|mle_ref| mle_ref.num_vars())
         .max()
         .ok_or(MleError::EmptyMleList)?;
 
@@ -230,29 +238,24 @@ pub fn prove_round_gate<F: FieldExt>(
     challenge: F,
     mle_refs: &mut Vec<Vec<DenseMleRef<F>>>,
 ) -> Vec<F> {
-    mle_refs.iter_mut().for_each(
-        |mle_ref_vec| {
-            mle_ref_vec.iter_mut().for_each(
-                |mle_ref| {
-                    mle_ref.fix_variable(round_index - 1, challenge);
+    mle_refs.iter_mut().for_each(|mle_ref_vec| {
+        mle_ref_vec.iter_mut().for_each(|mle_ref| {
+            mle_ref.fix_variable(round_index - 1, challenge);
         })
     });
-    let max_deg = mle_refs.iter().fold(
-        0, |acc, elem| {
-            max(acc, elem.len())
-        }
-    );
-    let evals_vec = mle_refs.iter_mut().map(
-        |mle_vec| {
+    let max_deg = mle_refs.iter().fold(0, |acc, elem| max(acc, elem.len()));
+    let evals_vec = mle_refs
+        .iter_mut()
+        .map(|mle_vec| {
             compute_sumcheck_message_no_beta_table(mle_vec, round_index, max_deg).unwrap()
-        }
-    ).collect_vec();
+        })
+        .collect_vec();
 
-    let final_evals = evals_vec.clone().into_iter().skip(1).fold(
-        Evals(evals_vec[0].clone()), |acc, elem| {
-            acc + Evals(elem)
-        }
-    );
+    let final_evals = evals_vec
+        .clone()
+        .into_iter()
+        .skip(1)
+        .fold(Evals(evals_vec[0].clone()), |acc, elem| acc + Evals(elem));
     let Evals(final_vec_evals) = final_evals;
     final_vec_evals
 }
@@ -338,7 +341,6 @@ pub fn compute_sumcheck_message_no_beta_table<F: FieldExt>(
     round_index: usize,
     degree: usize,
 ) -> Result<Vec<F>, GateError> {
-
     // --- Go through all of the MLEs being multiplied together on the LHS and see if any of them contain an IV ---
     // TODO!(ryancao): Should this not always be true...?
     let independent_variable = mles
@@ -394,14 +396,13 @@ pub fn libra_giraffe<F: FieldExt>(
     nonzero_gates: &Vec<(usize, usize, usize)>,
     num_dataparallel_bits: usize,
 ) -> Result<Vec<F>, GateError> {
-    
     // when we have an add gate, we can distribute the beta table over the dataparallel challenges
     // so we only multiply to the function with the x variables or y variables one at a time
     // when we have a mul gate, we have to multiply the beta table over the dataparallel challenges
     // with the function on the x variables and the function on the y variables
     let degree = match operation {
         BinaryOperation::Add => 2,
-        BinaryOperation::Mul => 3
+        BinaryOperation::Mul => 3,
     };
 
     if !beta_g2.indexed() {
@@ -489,8 +490,10 @@ pub fn libra_giraffe<F: FieldExt>(
                     // --- The evals we want are simply the element-wise product of the accessed evals ---
                     let g1_z_times_f2_evals_p2_x_times_f3_evals_p2_y = g1_z_successors
                         .zip(all_f2_evals_p2_x.zip(all_f3_evals_p2_y))
-                        .map(|(g1_z_eval, (f2_eval, f3_eval))| g1_z_eval * operation.perform_operation(f2_eval, f3_eval));
-    
+                        .map(|(g1_z_eval, (f2_eval, f3_eval))| {
+                            g1_z_eval * operation.perform_operation(f2_eval, f3_eval)
+                        });
+
                     let evals_iter: Box<dyn Iterator<Item = F>> =
                         Box::new(g1_z_times_f2_evals_p2_x_times_f3_evals_p2_y);
 

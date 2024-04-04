@@ -1,12 +1,19 @@
+// Copyright © 2024.  Modulus Labs, Inc.
+
+// Restricted Use License
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the ìSoftwareî), to use the Software internally for evaluation, non-production purposes only.  Any redistribution, reproduction, modification, sublicensing, publication, or other use of the Software is strictly prohibited.  In addition, usage of the Software is subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED ìAS ISî, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
 use itertools::Itertools;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 
 use crate::utils::halo2_fft;
-use crate::{
-    def_labels, LcCommit, LcEncoding,
-    LcEvalProof,
-};
+use crate::{def_labels, LcCommit, LcEncoding, LcEvalProof};
 use fffft::FFTError;
 use remainder_shared_types::FieldExt;
 
@@ -37,14 +44,14 @@ where
 
         // compute #cols, which must be a power of 2 because of FFT
         // computes the encoded num cols that will get closest to the ratio for original num cols : num rows
-        let encoded_num_cols = (((len as f64 * ratio).sqrt() / rho).ceil() as usize)
-            .checked_next_power_of_two()?;
+        let encoded_num_cols =
+            (((len as f64 * ratio).sqrt() / rho).ceil() as usize).checked_next_power_of_two()?;
 
         // minimize nr subject to #cols and rho
         // --- Not sure what the above is talking about, but basically computes ---
         // --- the other dimensions with respect to `encoded_num_cols` ---
         let orig_num_cols = (((encoded_num_cols as f64) * rho).floor()) as usize;
-        let num_rows = (len + orig_num_cols - 1) / orig_num_cols; 
+        let num_rows = (len + orig_num_cols - 1) / orig_num_cols;
 
         // --- Sanitycheck that we aren't going overboard or underboard ---
         assert!(orig_num_cols * num_rows >= len);

@@ -1,8 +1,18 @@
+// Copyright © 2024.  Modulus Labs, Inc.
+
+// Restricted Use License
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the ìSoftwareî), to use the Software internally for evaluation, non-production purposes only.  Any redistribution, reproduction, modification, sublicensing, publication, or other use of the Software is strictly prohibited.  In addition, usage of the Software is subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED ìAS ISî, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
 //! A transcript that uses the Poseidon hash function; Useful for recursive proving
 use std::marker::PhantomData;
 
-use itertools::Itertools;
 use crate::Poseidon;
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use tracing::trace;
 
@@ -22,7 +32,7 @@ pub struct PoseidonTranscript<F: FieldExt> {
     #[serde(default = "default_sponge")]
     sponge: Poseidon<F, 3, 2>,
     counter: usize,
-    _marker: PhantomData<F>
+    _marker: PhantomData<F>,
 }
 
 impl<F: FieldExt> Transcript<F> for PoseidonTranscript<F> {
@@ -35,7 +45,7 @@ impl<F: FieldExt> Transcript<F> for PoseidonTranscript<F> {
         Self {
             sponge: default_sponge(),
             counter: 1,
-            _marker: PhantomData
+            _marker: PhantomData,
         }
     }
 

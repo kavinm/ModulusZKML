@@ -1,6 +1,22 @@
+// Copyright © 2024.  Modulus Labs, Inc.
+
+// Restricted Use License
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the ìSoftwareî), to use the Software internally for evaluation, non-production purposes only.  Any redistribution, reproduction, modification, sublicensing, publication, or other use of the Software is strictly prohibited.  In addition, usage of the Software is subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED ìAS ISî, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+use crate::{
+    layer::{batched::combine_mles, combine_mle_refs::combine_mle_refs, LayerId},
+    mle::{
+        dense::{DenseMle, DenseMleRef},
+        MleAble,
+    },
+};
 use ark_std::log2;
 use itertools::{repeat_n, Itertools};
-use crate::{layer::{batched::combine_mles, combine_mle_refs::combine_mle_refs, LayerId}, mle::{dense::{DenseMle, DenseMleRef}, MleAble}};
 use remainder_shared_types::FieldExt;
 use serde::{Deserialize, Serialize};
 
@@ -21,7 +37,12 @@ pub struct BinDecomp16Bit<F> {
 impl<F: FieldExt> From<Vec<bool>> for BinDecomp16Bit<F> {
     fn from(bits: Vec<bool>) -> Self {
         BinDecomp16Bit::<F> {
-            bits: bits.iter().map(|x| F::from(*x as u64)).collect::<Vec<F>>().try_into().unwrap()
+            bits: bits
+                .iter()
+                .map(|x| F::from(*x as u64))
+                .collect::<Vec<F>>()
+                .try_into()
+                .unwrap(),
         }
     }
 }
@@ -51,18 +72,14 @@ impl<F: FieldExt> MleAble<F> for BinDecomp16Bit<F> {
     }
 
     fn to_iter(items: &Self::Repr) -> Self::IntoIter<'_> {
-        let elems = (0..items[0].len()).map(
-            |idx| {
-                let bits = items.iter().map(
-                    |item| {
-                        item[idx]
-                    }
-                ).collect_vec();
+        let elems = (0..items[0].len())
+            .map(|idx| {
+                let bits = items.iter().map(|item| item[idx]).collect_vec();
                 BinDecomp16Bit {
                     bits: bits.try_into().unwrap(),
                 }
-            }
-        ).collect_vec();
+            })
+            .collect_vec();
 
         elems.into_iter()
     }
@@ -90,18 +107,18 @@ impl<F: FieldExt> DenseMle<F, BinDecomp16Bit<F>> {
             let fourth_prefix = (bit_idx % 16) >= 8;
 
             let mle_indices = self
-            .prefix_bits
-            .clone()
-            .into_iter()
-            .flatten()
-            .chain(
-                std::iter::once(MleIndex::Fixed(first_prefix))
-                    .chain(std::iter::once(MleIndex::Fixed(second_prefix)))
-                    .chain(std::iter::once(MleIndex::Fixed(third_prefix)))
-                    .chain(std::iter::once(MleIndex::Fixed(fourth_prefix)))
-                    .chain(repeat_n(MleIndex::Iterated, num_vars - 4)),
-            )
-            .collect_vec();
+                .prefix_bits
+                .clone()
+                .into_iter()
+                .flatten()
+                .chain(
+                    std::iter::once(MleIndex::Fixed(first_prefix))
+                        .chain(std::iter::once(MleIndex::Fixed(second_prefix)))
+                        .chain(std::iter::once(MleIndex::Fixed(third_prefix)))
+                        .chain(std::iter::once(MleIndex::Fixed(fourth_prefix)))
+                        .chain(repeat_n(MleIndex::Iterated, num_vars - 4)),
+                )
+                .collect_vec();
 
             let bit_mle_ref = DenseMleRef {
                 bookkeeping_table: self.mle[bit_idx].to_vec(),
@@ -126,17 +143,25 @@ impl<F: FieldExt> DenseMle<F, BinDecomp16Bit<F>> {
         // TODO!(ryancao): This is an awful hacky fix so that we can use `combine_mles`.
         // Note that we are manually inserting the extra iterated bits as prefix bits.
         // We should stop doing this once `combine_mles` works as it should!
-        let self_mle_ref_vec = self.mle.clone().map(|mle_bookkeeping_table| {
-            DenseMle::new_from_raw(
-                mle_bookkeeping_table, 
-                self.layer_id, 
-                Some(
-                    self.get_prefix_bits().iter().flatten().cloned().chain(
-                        repeat_n(MleIndex::Iterated, 4)
-                    ).collect_vec()
+        let self_mle_ref_vec = self
+            .mle
+            .clone()
+            .map(|mle_bookkeeping_table| {
+                DenseMle::new_from_raw(
+                    mle_bookkeeping_table,
+                    self.layer_id,
+                    Some(
+                        self.get_prefix_bits()
+                            .iter()
+                            .flatten()
+                            .cloned()
+                            .chain(repeat_n(MleIndex::Iterated, 4))
+                            .collect_vec(),
+                    ),
                 )
-            ).mle_ref()
-        }).to_vec();
+                .mle_ref()
+            })
+            .to_vec();
         combine_mles(self_mle_ref_vec, 4)
     }
 
@@ -146,24 +171,25 @@ impl<F: FieldExt> DenseMle<F, BinDecomp16Bit<F>> {
     /// bits, followed by the appropriate MleRef indexing bits, gets us the same
     /// result as only using the same MleRef indexing bits on each MleRef from
     /// the `DenseMle<F, BinDecomp16Bit<F>>`.
-    /// 
+    ///
     /// TODO!(ende): refactor
-    pub fn combine_mle_batch(input_mle_batch: Vec<DenseMle<F, BinDecomp16Bit<F>>>) -> DenseMle<F, F> {
-        
+    pub fn combine_mle_batch(
+        input_mle_batch: Vec<DenseMle<F, BinDecomp16Bit<F>>>,
+    ) -> DenseMle<F, F> {
         let batched_bits = log2(input_mle_batch.len());
 
         let input_mle_batch_ref_combined = input_mle_batch
-            
-            .into_iter().map(
-                |x| {
-                    combine_mle_refs(
-                        x.mle_bit_refs()
-                    ).mle_ref()
-                }
-            ).collect_vec();
+            .into_iter()
+            .map(|x| combine_mle_refs(x.mle_bit_refs()).mle_ref())
+            .collect_vec();
 
-        let input_mle_batch_ref_combined_ref = combine_mles(input_mle_batch_ref_combined, batched_bits as usize);
+        let input_mle_batch_ref_combined_ref =
+            combine_mles(input_mle_batch_ref_combined, batched_bits as usize);
 
-        DenseMle::new_from_raw(input_mle_batch_ref_combined_ref.bookkeeping_table, LayerId::Input(0), None)
+        DenseMle::new_from_raw(
+            input_mle_batch_ref_combined_ref.bookkeeping_table,
+            LayerId::Input(0),
+            None,
+        )
     }
 }

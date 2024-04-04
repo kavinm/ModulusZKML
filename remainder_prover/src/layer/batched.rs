@@ -1,3 +1,13 @@
+// Copyright © 2024.  Modulus Labs, Inc.
+
+// Restricted Use License
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the ìSoftwareî), to use the Software internally for evaluation, non-production purposes only.  Any redistribution, reproduction, modification, sublicensing, publication, or other use of the Software is strictly prohibited.  In addition, usage of the Software is subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED ìAS ISî, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
 use ark_std::log2;
 use itertools::{repeat_n, Itertools};
 use std::marker::PhantomData;
@@ -9,7 +19,7 @@ use crate::{
         dense::{DenseMle, DenseMleRef},
         zero::ZeroMleRef,
         Mle, MleAble, MleIndex, MleRef,
-    }
+    },
 };
 use remainder_shared_types::FieldExt;
 
@@ -46,7 +56,6 @@ impl<F: FieldExt, A: LayerBuilder<F>> LayerBuilder<F> for BatchedLayer<F, A> {
 
         // dbg!(&exprs);
 
-        
         combine_expressions(exprs)
             .expect("Expressions fed into BatchedLayer don't have the same structure!")
     }
@@ -86,7 +95,6 @@ pub fn combine_zero_mle_ref<F: FieldExt>(mle_refs: Vec<ZeroMleRef<F>>) -> ZeroMl
     let layer_id = mle_refs[0].get_layer_id();
     ZeroMleRef::new(num_vars + new_bits, None, layer_id)
 }
-
 
 // pub fn fake_unbatch_mles<F: FieldExt>(mles: Vec<DenseMle<F, F>>, num_dataparallel_bits: usize) -> DenseMle<F, F> {
 //     let old_layer_id = mles[0].layer_id;
@@ -137,13 +145,13 @@ pub fn unflatten_mle<F: FieldExt>(
 ) -> Vec<DenseMle<F, F>> {
     let num_copies = 1 << num_dataparallel_bits;
     let individual_mle_len = 1 << (flattened_mle.num_iterated_vars() - num_dataparallel_bits);
-    
-    (0..num_copies).map(
-        |idx| {
+
+    (0..num_copies)
+        .map(|idx| {
             let zero = &F::zero();
             let copy_idx = idx;
-            let individual_mle_table = (0..individual_mle_len).map(
-                |mle_idx| {
+            let individual_mle_table = (0..individual_mle_len)
+                .map(|mle_idx| {
                     let flat_mle_ref = flattened_mle.mle_ref();
                     let val = flat_mle_ref
                         .bookkeeping_table
@@ -155,11 +163,18 @@ pub fn unflatten_mle<F: FieldExt>(
             let individual_mle: DenseMle<F, F> = DenseMle::new_from_raw(
                 individual_mle_table,
                 flattened_mle.layer_id,
-                Some(flattened_mle.get_prefix_bits().unwrap().into_iter().chain(repeat_n(MleIndex::Iterated, num_dataparallel_bits)).collect_vec()),
+                Some(
+                    flattened_mle
+                        .get_prefix_bits()
+                        .unwrap()
+                        .into_iter()
+                        .chain(repeat_n(MleIndex::Iterated, num_dataparallel_bits))
+                        .collect_vec(),
+                ),
             );
             individual_mle
-        }
-    ).collect_vec()
+        })
+        .collect_vec()
 }
 
 ///Helper function for batchedlayer that takes in m expressions of size n, and
@@ -177,7 +192,7 @@ fn combine_expressions_helper<F: FieldExt>(
     new_bits: usize,
 ) -> Result<ExpressionStandard<F>, CombineExpressionError> {
     //Check if all expressions have the same structure, and if they do, combine
-    //their parts. 
+    //their parts.
     //Combination is done through either recursion or simple methods, except for
     //Mle and Products; which use a helper function `combine_mles`
     match &exprs[0] {
@@ -305,7 +320,11 @@ pub fn combine_mles<F: FieldExt>(mles: Vec<DenseMleRef<F>>, new_bits: usize) -> 
     // --- TODO!(ryancao): SUPER hacky fix for the random packing constants ---
     // --- Basically if all the MLEs are exactly the same, we don't combine at all ---
     if matches!(layer_id, LayerId::RandomInput(_)) && old_num_vars == 0 {
-        let all_same = (0..mles[0].bookkeeping_table().len()).all(|idx| mles.iter().skip(1).all(|mle| (mles[0].bookkeeping_table()[idx] == mle.bookkeeping_table()[idx])));
+        let all_same = (0..mles[0].bookkeeping_table().len()).all(|idx| {
+            mles.iter()
+                .skip(1)
+                .all(|mle| (mles[0].bookkeeping_table()[idx] == mle.bookkeeping_table()[idx]))
+        });
         if all_same {
             return mles[0].clone();
         }
@@ -331,13 +350,11 @@ pub fn combine_mles<F: FieldExt>(mles: Vec<DenseMleRef<F>>, new_bits: usize) -> 
     }
 }
 
-
-
 #[cfg(test)]
 mod tests {
     use ark_std::test_rng;
-    use remainder_shared_types::Fr;
     use itertools::Itertools;
+    use remainder_shared_types::Fr;
 
     use crate::{
         expression::ExpressionStandard,

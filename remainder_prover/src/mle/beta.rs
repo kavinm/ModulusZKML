@@ -1,7 +1,16 @@
+// Copyright © 2024.  Modulus Labs, Inc.
+
+// Restricted Use License
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the ìSoftwareî), to use the Software internally for evaluation, non-production purposes only.  Any redistribution, reproduction, modification, sublicensing, publication, or other use of the Software is strictly prohibited.  In addition, usage of the Software is subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED ìAS ISî, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
 //!Module for dealing with the Beta equality function
 
 use std::fmt::Debug;
-
 
 use ark_std::cfg_into_iter;
 use itertools::Itertools;
@@ -140,7 +149,7 @@ impl<F: FieldExt> BetaTable<F> {
         if layer_claim_vars.len() > 0 {
             let (one_minus_r, r) = (F::one() - layer_claim_vars[0], layer_claim_vars[0]);
             let mut cur_table = vec![one_minus_r, r];
-    
+
             // TODO!(vishruti) make this parallelizable
             for claim in layer_claim_vars.iter().skip(1) {
                 let (one_minus_r, r) = (F::one() - claim, claim);
@@ -151,7 +160,7 @@ impl<F: FieldExt> BetaTable<F> {
                 firsthalf.extend(secondhalf.iter());
                 cur_table = firsthalf;
             }
-    
+
             let iterated_bit_indices = (0..layer_claim_vars.len()).collect_vec();
             let cur_table_mle_ref: DenseMleRef<F> =
                 DenseMle::new_from_raw(cur_table, LayerId::Input(0), None).mle_ref();
@@ -160,15 +169,13 @@ impl<F: FieldExt> BetaTable<F> {
                 table: cur_table_mle_ref,
                 relevant_indices: iterated_bit_indices,
             })
-        }
-        else {
+        } else {
             Ok(BetaTable {
                 layer_claim_vars: vec![],
                 table: DenseMle::new_from_raw(vec![F::one()], LayerId::Input(0), None).mle_ref(),
                 relevant_indices: vec![],
             })
         }
-        
     }
 
     /// Fix variable for a beta table

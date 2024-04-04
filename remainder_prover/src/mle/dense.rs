@@ -1,3 +1,13 @@
+// Copyright © 2024.  Modulus Labs, Inc.
+
+// Restricted Use License
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the ìSoftwareî), to use the Software internally for evaluation, non-production purposes only.  Any redistribution, reproduction, modification, sublicensing, publication, or other use of the Software is strictly prohibited.  In addition, usage of the Software is subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED ìAS ISî, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
 use std::{
     fmt::Debug,
     iter::{Cloned, Map, Zip},
@@ -12,9 +22,10 @@ use rayon::{prelude::ParallelIterator, slice::ParallelSlice};
 use serde::{Deserialize, Serialize};
 
 use super::{mle_enum::MleEnum, Mle, MleAble, MleIndex, MleRef};
-use crate::{expression::ExpressionStandard, layer::{batched, claims::Claim, combine_mle_refs::combine_mle_refs}};
+use crate::layer::{batched::combine_mles, LayerId};
 use crate::{
-    layer::{batched::combine_mles, LayerId},
+    expression::ExpressionStandard,
+    layer::{batched, claims::Claim, combine_mle_refs::combine_mle_refs},
 };
 use remainder_shared_types::FieldExt;
 
@@ -98,19 +109,12 @@ impl<F: FieldExt, T: Send + Sync + Clone + Debug + MleAble<F>> DenseMle<F, T> {
         }
     }
 
-    pub fn batch_dense_mle(
-        mles: Vec<DenseMle<F, T>>,
-    ) -> DenseMle<F, T> {
-
+    pub fn batch_dense_mle(mles: Vec<DenseMle<F, T>>) -> DenseMle<F, T> {
         let layer_id = mles[0].layer_id;
         let prefix_bits = mles[0].clone().prefix_bits;
         let mle_flattened = mles.iter().map(|mle| mle.into_iter()).flatten();
 
-        Self::new_from_iter(
-            mle_flattened,
-            layer_id,
-            prefix_bits,
-        )
+        Self::new_from_iter(mle_flattened, layer_id, prefix_bits)
     }
 }
 
@@ -251,18 +255,19 @@ impl<F: FieldExt> DenseMle<F, F> {
 
     ///Splits the mle into a new mle with a tuple of size 2 as it's element
     pub fn split_tree(&self, num_split: usize) -> DenseMle<F, TupleTree<F>> {
-
         let mut first_half = vec![];
         let mut second_half = vec![];
-        self.mle.clone().into_iter().enumerate().for_each(
-            |(idx, elem)| {
-                if (idx % (num_split*2)) < (num_split) {
+        self.mle
+            .clone()
+            .into_iter()
+            .enumerate()
+            .for_each(|(idx, elem)| {
+                if (idx % (num_split * 2)) < (num_split) {
                     first_half.push(elem);
                 } else {
                     second_half.push(elem);
                 }
-            }
-        );
+            });
 
         DenseMle::new_from_raw(
             [first_half, second_half],
@@ -446,10 +451,6 @@ impl<F: FieldExt> DenseMle<F, Tuple2<F>> {
     }
 }
 
-
-
-
-
 #[derive(Debug, Clone)]
 ///Newtype around a tuple of field elements
 pub struct TupleTree<F: FieldExt>(pub (F, F));
@@ -487,7 +488,6 @@ impl<F: FieldExt> From<(F, F)> for TupleTree<F> {
     }
 }
 
-
 impl<F: FieldExt> DenseMle<F, TupleTree<F>> {
     ///Gets an MleRef to the first element in the tuple
     pub fn first(&'_ self, splitter: usize) -> DenseMleRef<F> {
@@ -499,12 +499,12 @@ impl<F: FieldExt> DenseMle<F, TupleTree<F>> {
             .clone()
             .into_iter()
             .flatten()
-            .chain(
-                repeat_n(MleIndex::Iterated, splitter).chain(
-                    std::iter::once(MleIndex::Fixed(false)) 
-                    .chain(repeat_n(MleIndex::Iterated, new_num_iterated_vars - splitter))
-                ),
-            )
+            .chain(repeat_n(MleIndex::Iterated, splitter).chain(
+                std::iter::once(MleIndex::Fixed(false)).chain(repeat_n(
+                    MleIndex::Iterated,
+                    new_num_iterated_vars - splitter,
+                )),
+            ))
             .collect_vec();
 
         DenseMleRef {
@@ -527,12 +527,12 @@ impl<F: FieldExt> DenseMle<F, TupleTree<F>> {
             .clone()
             .into_iter()
             .flatten()
-            .chain(
-                repeat_n(MleIndex::Iterated, splitter).chain(
-                    std::iter::once(MleIndex::Fixed(true)) 
-                    .chain(repeat_n(MleIndex::Iterated, new_num_iterated_vars - splitter))
-                ),
-            )
+            .chain(repeat_n(MleIndex::Iterated, splitter).chain(
+                std::iter::once(MleIndex::Fixed(true)).chain(repeat_n(
+                    MleIndex::Iterated,
+                    new_num_iterated_vars - splitter,
+                )),
+            ))
             .collect_vec();
 
         DenseMleRef {
@@ -546,9 +546,7 @@ impl<F: FieldExt> DenseMle<F, TupleTree<F>> {
             indexed: false,
         }
     }
-
 }
-
 
 // --------------------------- MleRef stuff ---------------------------
 
@@ -757,7 +755,6 @@ impl<F: FieldExt> MleRef for DenseMleRef<F> {
         self.bookkeeping_table = new.collect();
         // --- Just returns the final value if we've collapsed the table into a single value ---
         if self.bookkeeping_table.len() == 1 {
-
             // dbg!(&self);
             let mut fixed_claim_return = Claim::new_raw(
                 self.mle_indices

@@ -1,3 +1,13 @@
+// Copyright © 2024.  Modulus Labs, Inc.
+
+// Restricted Use License
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the ìSoftwareî), to use the Software internally for evaluation, non-production purposes only.  Any redistribution, reproduction, modification, sublicensing, publication, or other use of the Software is strictly prohibited.  In addition, usage of the Software is subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED ìAS ISî, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
 use crate::adapter::{convert_lcpc_to_halo, LigeroClaim, LigeroProof};
 use crate::ligero_ml_helper::{get_ml_inner_outer_tensors, naive_eval_mle_at_challenge_point};
 use crate::ligero_structs::{LigeroCommit, LigeroEncoding, LigeroEvalProof};
@@ -303,10 +313,7 @@ pub fn remainder_ligero_verify<F: FieldExt>(
     F: FieldExt,
 {
     // --- Sanitycheck ---
-    assert_eq!(
-        aux.num_rows * aux.orig_num_cols,
-        1 << challenge_coord.len()
-    );
+    assert_eq!(aux.num_rows * aux.orig_num_cols, 1 << challenge_coord.len());
 
     // --- Grab the inner/outer tensors from the challenge point ---
     let (inner_tensor, outer_tensor) =
@@ -316,9 +323,18 @@ pub fn remainder_ligero_verify<F: FieldExt>(
     let _ = tr.append_field_element("root", root.root);
 
     // --- Reconstruct the encoding (TODO!(ryancao): Deprecate the encoding!) and verify ---
-    let enc = LigeroEncoding::<F>::new_from_dims(proof.get_orig_num_cols(), proof.get_encoded_num_cols());
-    let result = verify(&root.root, &outer_tensor[..], &inner_tensor[..], proof, &enc, tr).unwrap();
-    
+    let enc =
+        LigeroEncoding::<F>::new_from_dims(proof.get_orig_num_cols(), proof.get_encoded_num_cols());
+    let result = verify(
+        &root.root,
+        &outer_tensor[..],
+        &inner_tensor[..],
+        proof,
+        &enc,
+        tr,
+    )
+    .unwrap();
+
     assert_eq!(result, claimed_value);
 }
 
@@ -332,12 +348,12 @@ pub mod tests {
         verify,
     };
     use ark_std::test_rng;
-    use remainder_shared_types::Fr;
     use itertools::Itertools;
     use rand::Rng;
     use remainder_shared_types::transcript::{
         poseidon_transcript::PoseidonTranscript, Transcript as RemainderTranscript,
     };
+    use remainder_shared_types::Fr;
     use std::iter::repeat_with;
 
     use super::{
